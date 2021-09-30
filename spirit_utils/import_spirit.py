@@ -1,6 +1,3 @@
-import sys, os
-from importlib.machinery import SourceFileLoader
-
 class spirit_info:
     path : str = ""
     version : str = ""
@@ -19,11 +16,17 @@ class spirit_info:
     def __str__(self):
         return '\n'.join(('    {} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
 
-class No_Viable_Candidates_Exception(Exception):
-    pass
+    def insert_in_path(self, idx=0):
+        import sys
+        sys.path.insert(idx, self.path)
+
 
 def find_spirit(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, stop_on_first_viable=True):
-    """ Searches the directory tree starting from 'base_dir' and finds all instances of the spirit python library.
+    import os
+    from importlib.machinery import SourceFileLoader
+
+    """ 
+    Searches the directory tree starting from 'base_dir' and finds all instances of the spirit python library.
     """
 
     def pr(msg):
@@ -85,18 +88,28 @@ def find_spirit(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, 
             pr("---")
             pr(c)
             pr("---")
-        # raise Exception("Too many viable candidate_list! Specify 'choose' function or set `stop_on_first_viable = True`")
-        return candidate_list # Or rather raise an exception?
 
-    if(len(candidate_list) == 0):
-        raise No_Viable_Candidates_Exception("Found no viable candidate! ({} rejected by choose function)".format(n_rejected_by_choose))
+    return candidate_list, n_rejected_by_choose # Or rather raise an exception?
 
-    if(len(candidate_list) == 1):
-        pr("Inserting at beginning of python path")
-        insert_path(candidate_list[0].path)
-        return candidate_list
 
-if __name__ == "__main__":
-    candidates = find_spirit("~/Coding/spirit", 0)
-    (print(c) for c in candidates)
-    from spirit import state
+class Candidates_Exception(Exception):
+    pass
+
+
+def find_and_insert(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, stop_on_first_viable=True):
+    """ 
+    Searches the directory tree starting from 'base_dir' and inserts the path to the spirit library into the python path.
+    Raises Candidates_Exception if no viable candidates are found or if more than one viable candidate is found.
+    """
+
+    candidates, n_rejected = find_spirit(base_dir, quiet, choose, stop_on_first_viable)
+
+    if len(candidates) > 1:
+        raise Candidates_Exception("Too many viable candidates! Specify 'choose' function or set `stop_on_first_viable = True`")
+
+    if len(candidates) == 0:
+        raise Candidates_Exception("No viable candidates! ({} rejected by choose function)`".format(n_rejected))
+
+    candidates[0].insert_in_path()
+
+    return candidates
