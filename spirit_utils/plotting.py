@@ -3,9 +3,21 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 import numpy as np
 
-from spirit import geometry, system
+def colorbar(mappable, *args, **kwargs):
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    import matplotlib.pyplot as plt
+    last_axes = plt.gca()
+    ax = mappable.axes
+    fig = ax.figure
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = fig.colorbar(mappable, cax=cax, *args, **kwargs)
+    plt.sca(last_axes)
+    return cbar
 
 def plot_basis_cell(p_state, ax=None):
+    from spirit import geometry, system
+
     # Read out the information we need
     n_cell_atoms  = geometry.get_n_cell_atoms(p_state)
     n_cells       = geometry.get_n_cells(p_state)
@@ -24,18 +36,36 @@ def plot_basis_cell(p_state, ax=None):
     ax.set_xlabel(r"$x\;\;[\AA]$")
     ax.set_ylabel(r"$y\;\;[\AA]$")
 
+def set_kwarg_if_not_there(kwarg_dict, key, value):
+    if not key in kwarg_dict:
+        kwarg_dict[key] = value
 
-def plot_spins(p_state, ax = None, **kwargs):
-    n_cell_atoms  = geometry.get_n_cell_atoms(p_state)
-    n_cells       = geometry.get_n_cells(p_state)
-    positions     = geometry.get_positions(p_state)
-    spins         = system.get_spin_directions(p_state)
+def plot_spins_2d(spin_system, ax, col_xy = [0,1], x=None, y=None, u=None, v=None, c=None, **kwargs):
 
-    x = positions[:,0]
-    y = positions[:,1]
-    u = spins[:,0]
-    v = spins[:,1]
-    C = spins[:,2]
+    set_kwarg_if_not_there(kwargs, "lw", 1)
+    set_kwarg_if_not_there(kwargs, "units", "xy")
+    set_kwarg_if_not_there(kwargs, "edgecolor", "black")
+    set_kwarg_if_not_there(kwargs, "scale", 2)
+    set_kwarg_if_not_there(kwargs, "width", 0.13)
+    set_kwarg_if_not_there(kwargs, "pivot", "mid")
+    set_kwarg_if_not_there(kwargs, "cmap", "seismic")
+    set_kwarg_if_not_there(kwargs, "alpha", 0.65)
+    set_kwarg_if_not_there(kwargs, "clim", (-1,1))
 
-    ax.quiver(x, y, u, v, C, pivot='mid',  angles='xy', scale_units='xy', scale=0.6)
+    if (not (x and y)):
+        x = spin_system.positions[:,col_xy[0]]
+        y = spin_system.positions[:,col_xy[1]]
+
+    if (not (u and v and c)):
+        u = spin_system.spins[:,col_xy[0]]
+        v = spin_system.spins[:,col_xy[1]]
+        color_column = [ i for i in [0,1,2] if i not in col_xy ]
+        c = spin_system.spins[:,color_column]
+
+    ax.set_aspect("equal")
+
+    cb = ax.quiver(x,y,u,v,c, **kwargs)
     ax.scatter(x,y, marker = ".", color = "black", s = 1)
+    ax.set_xlabel(r"$x~[\AA]$")
+    ax.set_ylabel(r"$y~[\AA]$")
+    colorbar(cb, label=r"$\mathbf{m}_z$")
