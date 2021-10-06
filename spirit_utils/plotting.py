@@ -42,14 +42,14 @@ def set_kwarg_if_not_there(kwarg_dict, key, value):
 
 def plot_spins_2d(spin_system, ax, col_xy = [0,1], x=None, y=None, u=None, v=None, c=None, **kwargs):
 
-    set_kwarg_if_not_there(kwargs, "lw", 1)
+    set_kwarg_if_not_there(kwargs, "lw", 0.5)
     set_kwarg_if_not_there(kwargs, "units", "xy")
     set_kwarg_if_not_there(kwargs, "edgecolor", "black")
     set_kwarg_if_not_there(kwargs, "scale", 2)
     set_kwarg_if_not_there(kwargs, "width", 0.13)
     set_kwarg_if_not_there(kwargs, "pivot", "mid")
     set_kwarg_if_not_there(kwargs, "cmap", "seismic")
-    set_kwarg_if_not_there(kwargs, "alpha", 0.65)
+    set_kwarg_if_not_there(kwargs, "alpha", 1)
     set_kwarg_if_not_there(kwargs, "clim", (-1,1))
 
     if (not (x and y)):
@@ -69,3 +69,28 @@ def plot_spins_2d(spin_system, ax, col_xy = [0,1], x=None, y=None, u=None, v=Non
     ax.set_xlabel(r"$x~[\AA]$")
     ax.set_ylabel(r"$y~[\AA]$")
     colorbar(cb, label=r"$\mathbf{m}_z$")
+
+class energy_path:
+    reaction_coordinate  = []
+    total_energy         = []
+    energy_contributions = {}
+    interpolated_reaction_coordinate = []
+    interpolated_total_energy = []
+    interpolated_energy_contributions = {}
+
+def energy_path_from_p_state(p_state):
+    from spirit import chain
+    result = energy_path()
+    result.reaction_coordinate              = chain.get_reaction_coordinate(p_state)
+    result.total_energy                     = chain.get_energy(p_state)
+    result.interpolated_reaction_coordinate = chain.get_reaction_coordinate_interpolated(p_state)
+    result.interpolated_total_energy        = chain.get_energy_interpolated(p_state)
+    return result
+
+def plot_energy_path(energy_path, ax, **kwargs):
+
+    ax.plot( energy_path.reaction_coordinate,              energy_path.total_energy - energy_path.total_energy[0], marker="o", ls="None", label="Total", color="C0" )
+    ax.plot( energy_path.interpolated_reaction_coordinate, energy_path.interpolated_total_energy - energy_path.total_energy[0], color="C0", ls="-", label="" )
+
+    ax.set_xlabel( "reaction coordinate [arb. units]" )
+    ax.set_ylabel( r"$\Delta E$ [meV]" )
