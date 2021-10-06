@@ -1,11 +1,11 @@
 import numpy as np
 
 class Spin_System:
-    positions = []
-    spins = []
-    n_cells = [0,0,0]
-    n_cell_atoms = 0
-    basis = []
+    positions       = []
+    spins           = []
+    n_cells         = [0,0,0]
+    n_cell_atoms    = 0
+    basis           = [[0,0,0]]
     bravais_vectors = [[0,0,0],[0,0,0],[0,0,0]]
     unordered = False
 
@@ -15,6 +15,16 @@ class Spin_System:
         sliced_spin_system.spins     = self.spins[key]
         sliced_spin_system.unordered = True # For a general slice we do not necessarily retain the lattice structure
         return sliced_spin_system
+
+    def copy(self):
+        copy = Spin_System()
+        copy.positions = np.array(self.positions)
+        copy.spins = np.array(self.spins)
+        copy.n_cells = np.array(self.n_cells)
+        copy.basis = np.array(self.basis)
+        copy.bravais_vectors = np.array(self.bravais_vectors)
+        copy.unordered = self.unordered
+        return copy
 
     def is_flat(self):
         return len(self.positions.shape) == 2
