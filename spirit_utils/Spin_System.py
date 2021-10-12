@@ -42,6 +42,9 @@ class Spin_System:
     def nos(self):
         return self.n_cells[0] * self.n_cells[1] * self.n_cells[2] * self.n_cell_atoms
 
+    def center(self):
+        return np.mean(self.positions, axis=0)
+
     def a_slice(self, val):
         was_flat = self.is_flat()
         if was_flat:
