@@ -18,12 +18,12 @@ class Spin_System:
 
     def copy(self):
         copy = Spin_System()
-        copy.positions = np.array(self.positions)
-        copy.spins = np.array(self.spins)
-        copy.n_cells = np.array(self.n_cells)
-        copy.basis = np.array(self.basis)
+        copy.positions       = np.array(self.positions)
+        copy.spins           = np.array(self.spins)
+        copy.n_cells         = np.array(self.n_cells)
+        copy.basis           = np.array(self.basis)
         copy.bravais_vectors = np.array(self.bravais_vectors)
-        copy.unordered = self.unordered
+        copy.unordered       = self.unordered
         return copy
 
     def is_flat(self):
@@ -108,3 +108,20 @@ def spin_system_from_p_state(p_state, copy=False):
         spin_system.n_cells      = np.array(spin_system.n_cells     )
 
     return spin_system
+
+class energy_path:
+    reaction_coordinate  = []
+    total_energy         = []
+    energy_contributions = {}
+    interpolated_reaction_coordinate = []
+    interpolated_total_energy = []
+    interpolated_energy_contributions = {}
+
+def energy_path_from_p_state(p_state):
+    from spirit import chain
+    result = energy_path()
+    result.reaction_coordinate              = chain.get_reaction_coordinate(p_state)
+    result.total_energy                     = chain.get_energy(p_state)
+    result.interpolated_reaction_coordinate = chain.get_reaction_coordinate_interpolated(p_state)
+    result.interpolated_total_energy        = chain.get_energy_interpolated(p_state)
+    return result

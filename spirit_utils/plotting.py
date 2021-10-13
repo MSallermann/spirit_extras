@@ -70,23 +70,6 @@ def plot_spins_2d(spin_system, ax, col_xy = [0,1], x=None, y=None, u=None, v=Non
     ax.set_ylabel(r"$y~[\AA]$")
     colorbar(cb, label=r"$\mathbf{m}_z$")
 
-class energy_path:
-    reaction_coordinate  = []
-    total_energy         = []
-    energy_contributions = {}
-    interpolated_reaction_coordinate = []
-    interpolated_total_energy = []
-    interpolated_energy_contributions = {}
-
-def energy_path_from_p_state(p_state):
-    from spirit import chain
-    result = energy_path()
-    result.reaction_coordinate              = chain.get_reaction_coordinate(p_state)
-    result.total_energy                     = chain.get_energy(p_state)
-    result.interpolated_reaction_coordinate = chain.get_reaction_coordinate_interpolated(p_state)
-    result.interpolated_total_energy        = chain.get_energy_interpolated(p_state)
-    return result
-
 def plot_energy_path(energy_path, ax, **kwargs):
 
     ax.plot( energy_path.reaction_coordinate,              energy_path.total_energy - energy_path.total_energy[0], marker="o", ls="None", label="Total", color="C0" )
