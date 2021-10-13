@@ -70,10 +70,54 @@ def plot_spins_2d(spin_system, ax, col_xy = [0,1], x=None, y=None, u=None, v=Non
     ax.set_ylabel(r"$y~[\AA]$")
     colorbar(cb, label=r"$\mathbf{m}_z$")
 
-def plot_energy_path(energy_path, ax, **kwargs):
+class energy_path:
+    reaction_coordinate  = []
+    total_energy         = []
+    energy_contributions = {}
+    interpolated_reaction_coordinate = []
+    interpolated_total_energy = []
+    interpolated_energy_contributions = {}
 
-    ax.plot( energy_path.reaction_coordinate,              energy_path.total_energy - energy_path.total_energy[0], marker="o", ls="None", label="Total", color="C0" )
-    ax.plot( energy_path.interpolated_reaction_coordinate, energy_path.interpolated_total_energy - energy_path.total_energy[0], color="C0", ls="-", label="" )
+def energy_path_from_p_state(p_state):
+    from spirit import chain
+    chain.update_data(p_state)
+    result = energy_path()
+    result.reaction_coordinate              = np.asarray(chain.get_reaction_coordinate(p_state))
+    result.total_energy                     = np.asarray(chain.get_energy(p_state))
+
+    result.interpolated_reaction_coordinate = np.asarray(chain.get_reaction_coordinate_interpolated(p_state))
+    result.interpolated_total_energy        = np.asarray(chain.get_energy_interpolated(p_state))
+
+    if(result.interpolated_reaction_coordinate[-1] == 0): # Quick check if the interpolated quantities have been computed
+        result.interpolated_reaction_coordinate = []
+        result.interpolated_total_energy = []
+
+    return result
+
+def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwargs_discrete={}, kwargs_interpolated={}):
+
+    set_kwarg_if_not_there(kwargs_discrete, "markeredgecolor", "black")
+    set_kwarg_if_not_there(kwargs_discrete, "marker", "o")
+    set_kwarg_if_not_there(kwargs_discrete, "ls", "None")
+    set_kwarg_if_not_there(kwargs_discrete, "color", "C0")
+
+    set_kwarg_if_not_there(kwargs_interpolated, "lw", 1.75)
+    set_kwarg_if_not_there(kwargs_interpolated, "marker", "None")
+    set_kwarg_if_not_there(kwargs_interpolated, "ls", "-")
+    set_kwarg_if_not_there(kwargs_interpolated, "color", kwargs_discrete["color"])
+
+    E0 = energy_path.total_energy[-1]
+
+    if(len(energy_path.interpolated_reaction_coordinate) > 0):
+        Rx_int = energy_path.interpolated_reaction_coordinate
+        if normalize_reaction_coordinate:
+            Rx_int = Rx_int / Rx_int[-1]
+        ax.plot(Rx_int, np.asarray(energy_path.interpolated_total_energy) - E0, **kwargs_interpolated )
+
+    Rx = energy_path.reaction_coordinate
+    if normalize_reaction_coordinate:
+        Rx = Rx / Rx[-1]
+    ax.plot(Rx, np.asarray(energy_path.total_energy) - E0, **kwargs_discrete)
 
     ax.set_xlabel( "reaction coordinate [arb. units]" )
     ax.set_ylabel( r"$\Delta E$ [meV]" )

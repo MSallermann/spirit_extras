@@ -79,8 +79,10 @@ def find_spirit(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, 
                     candidate.idx = len(candidate_list)
                     candidate_list.append(candidate)
 
-                if len(candidate_list) > 0:
-                    break
+                break # We break here because, we dont need to evaluate any other file than "spiritlib.py"
+
+        if len(candidate_list) > 0 and stop_on_first_viable:
+            break
 
     if(len(candidate_list) > 1):
         pr("Found {} viable candidate".format(len(candidate_list)))
