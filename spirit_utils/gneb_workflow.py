@@ -1,0 +1,177 @@
+from anytree import Node, NodeMixin, RenderTree 
+from anytree.exporter import DotExporter
+import os
+
+import shutil
+
+from numpy import inf
+
+from .data import energy_path, energy_path_from_p_state
+from .util import set_output_folder
+from .chain_io import chain_write_split_at
+from datetime import datetime
+
+class GNEB_Node(NodeMixin):
+
+    chain_file : str = ""
+    input_file : str = ""
+    gneb_workflow_log_file : str = ""
+    current_energy_path = object()
+    n_iterations_check = 1000
+    total_iterations = 0
+    intermediate_minima = []
+
+    state_prepare_callback = None
+    gneb_step_callback = None
+    exit_callback = None
+    before_gneb_callback = None
+    before_llg_callback = None
+
+    output_folder = ""
+
+    _converged = False
+
+    def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
+
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        self.output_folder = output_folder
+
+        self.chain_file = output_folder + "/chain.ovf"
+
+        if(initial_chain_file):
+            if not os.path.exists(initial_chain_file):
+                raise Exception("Initial chain file does not exist!")
+            shutil.copyfile(initial_chain_file, self.chain_file)
+
+        self.input_file = input_file
+        self.name = name
+        self.parent = parent
+        if not gneb_workflow_log_file:
+            self.gneb_workflow_log_file = self.output_folder + "/workflow_log.txt"
+        else:
+            self.gneb_workflow_log_file = gneb_workflow_log_file
+        if children:
+            self.children = children
+
+        creation_msg = "Creating new GNEB_Node '{}'".format(name)
+        if(parent):
+            creation_msg += ", parent '{}'".format(parent.name)
+        if(children):
+            creation_msg += ", children: "
+            for c in children:
+                creation_msg += "{} ".format(c.name)
+        self.log(creation_msg)
+
+    def log(self, message):
+        now = datetime.now()
+        current_time = now.strftime("%m/%d/%Y, %H:%M:%S")
+        log_string = "{} [{:^20}] : {}".format(current_time, self.name, message)
+        with open(self.gneb_workflow_log_file, "a") as f:
+            print(log_string, file=f)
+
+    def check_for_minima(self):
+        self.intermediate_minima = []
+        e = self.current_energy_path.total_energy
+        for i in range(1, len(e) - 1): # Leave out the first and the last energy
+            if(e[i-1] > e[i] and e[i+1] > e[i] ):
+                self.intermediate_minima.append(i)
+
+    def spawn_children(self, p_state):
+        self.log("Spawning children")
+
+        from spirit import chain
+
+        # Instantiate the GNEB nodes
+        noi = chain.get_noi(p_state)
+
+        idx_list = [0, *self.intermediate_minima, noi-1]
+
+        idx_pair_list = [ (idx_list[i], idx_list[i+1]) for i in range(len(idx_list)-1) ]
+
+        for i1,i2 in idx_pair_list:
+            # Attributes that change due to tree structure
+            child_name          = self.name + "_{}".format(len(self.children))
+            child_input_file    = self.input_file
+            child_output_folder = self.output_folder + "/{}".format( len(self.children))
+            self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
+
+            # Copy the other attributes
+            self.children[-1].state_prepare_callback = self.state_prepare_callback
+            self.children[-1].gneb_step_callback     = self.gneb_step_callback
+            self.children[-1].exit_callback          = self.exit_callback
+            self.children[-1].before_gneb_callback   = self.before_gneb_callback
+            self.children[-1].before_llg_callback    = self.before_llg_callback
+            self.children[-1].n_iterations_check     = self.n_iterations_check
+
+        chain_filename_list = [c.chain_file for c in self.children]
+        chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
+
+    def run(self):
+        """ 
+        """
+
+        self.log("Running")
+
+        from spirit import state, simulation, io, transition, chain
+
+        with state.State(self.input_file) as p_state:
+            set_output_folder(p_state, self.output_folder)
+
+            if self.state_prepare_callback:
+                self.state_prepare_callback(self, p_state)
+
+            if not os.path.exists(self.chain_file):
+                raise Exception("Chain file does not exist!")
+
+            io.chain_read(p_state, self.chain_file)
+            noi = chain.get_noi(p_state)
+
+            if(noi <= 8):
+                self.log("Too few images ({}). Inserting additional interpolated images".format(noi))
+
+            while(noi <= 8):
+                transition.homogeneous_insert_interpolated(p_state, 1)
+                noi = chain.get_noi(p_state)
+
+            self.log("Number of images = {}".format(noi))
+
+            self.current_energy_path = energy_path_from_p_state(p_state)
+            if self.before_gneb_callback:
+                self.before_gneb_callback(self, p_state)
+
+            while(len(self.intermediate_minima) == 0 and not self._converged):
+                info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
+                self.current_energy_path = energy_path_from_p_state(p_state)
+                self.check_for_minima()
+
+                self.total_iterations += info.total_iterations
+
+                self.log("Total iterations = {}".format(self.total_iterations))
+                self.log("      max.torque = {}".format(info.max_torque))
+                self.log("      ips        = {}".format(info.total_ips))
+
+                self._converged = info.max_torque < 1e-7
+
+                if(self.gneb_step_callback):
+                    self.gneb_step_callback(self, p_state)
+
+            self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
+            if self.before_llg_callback:
+                self.before_llg_callback(self, p_state)
+
+            self.log("Relaxing intermediate minima")
+            for idx_minimum in self.intermediate_minima:
+                simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
+
+            if(self.exit_callback):
+                self.exit_callback(self, p_state)
+
+            self.log("Writing chain to {}".format(self.chain_file))
+            io.chain_write(p_state, self.chain_file)
+
+            if not self._converged:
+                self.spawn_children(p_state)
+                self.children[0].run()
+            else:
+                self.log("Converged!")
