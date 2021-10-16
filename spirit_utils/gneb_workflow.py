@@ -3,6 +3,7 @@ from anytree.exporter import DotExporter
 import os
 
 import shutil
+import copy
 
 from numpy import inf
 
@@ -20,6 +21,8 @@ class GNEB_Node(NodeMixin):
     n_iterations_check = 1000
     total_iterations = 0
     intermediate_minima = []
+
+    target_noi = 10
 
     state_prepare_callback = None
     gneb_step_callback = None
@@ -77,6 +80,11 @@ class GNEB_Node(NodeMixin):
             if(e[i-1] > e[i] and e[i+1] > e[i] ):
                 self.intermediate_minima.append(i)
 
+    def save_chain(self, p_state):
+        from spirit import io
+        self.log("Writing chain to {}".format(self.chain_file))
+        io.chain_write(p_state, self.chain_file)
+
     def spawn_children(self, p_state):
         self.log("Spawning children")
 
@@ -97,6 +105,7 @@ class GNEB_Node(NodeMixin):
             self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
 
             # Copy the other attributes
+            self.children[-1].target_noi             = self.target_noi
             self.children[-1].state_prepare_callback = self.state_prepare_callback
             self.children[-1].gneb_step_callback     = self.gneb_step_callback
             self.children[-1].exit_callback          = self.exit_callback
@@ -127,10 +136,10 @@ class GNEB_Node(NodeMixin):
             io.chain_read(p_state, self.chain_file)
             noi = chain.get_noi(p_state)
 
-            if(noi <= 8):
+            if(noi <= self.target_noi):
                 self.log("Too few images ({}). Inserting additional interpolated images".format(noi))
 
-            while(noi <= 8):
+            while(noi <= self.target_noi):
                 transition.homogeneous_insert_interpolated(p_state, 1)
                 noi = chain.get_noi(p_state)
 
@@ -140,21 +149,28 @@ class GNEB_Node(NodeMixin):
             if self.before_gneb_callback:
                 self.before_gneb_callback(self, p_state)
 
-            while(len(self.intermediate_minima) == 0 and not self._converged):
-                info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
-                self.current_energy_path = energy_path_from_p_state(p_state)
-                self.check_for_minima()
+            try:
+                while(len(self.intermediate_minima) == 0 and not self._converged):
+                    info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
+                    self.current_energy_path = energy_path_from_p_state(p_state)
+                    self.check_for_minima()
 
-                self.total_iterations += info.total_iterations
+                    self.total_iterations += info.total_iterations
 
-                self.log("Total iterations = {}".format(self.total_iterations))
-                self.log("      max.torque = {}".format(info.max_torque))
-                self.log("      ips        = {}".format(info.total_ips))
+                    self.log("Total iterations = {}".format(self.total_iterations))
+                    self.log("      max.torque = {}".format(info.max_torque))
+                    self.log("      ips        = {}".format(info.total_ips))
 
-                self._converged = info.max_torque < 1e-7
+                    self._converged = info.max_torque < 1e-7
 
-                if(self.gneb_step_callback):
-                    self.gneb_step_callback(self, p_state)
+                    if(self.gneb_step_callback):
+                        self.gneb_step_callback(self, p_state)
+            except KeyboardInterrupt as e:
+                self.log("Interrupt during run loop")
+                self.save_chain(p_state)
+                if(self.exit_callback):
+                    self.exit_callback(self, p_state)
+                raise e
 
             self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
             if self.before_llg_callback:
@@ -167,8 +183,7 @@ class GNEB_Node(NodeMixin):
             if(self.exit_callback):
                 self.exit_callback(self, p_state)
 
-            self.log("Writing chain to {}".format(self.chain_file))
-            io.chain_write(p_state, self.chain_file)
+            self.save_chain(p_state)
 
             if not self._converged:
                 self.spawn_children(p_state)
