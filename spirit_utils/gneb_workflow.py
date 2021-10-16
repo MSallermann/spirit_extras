@@ -19,11 +19,13 @@ class GNEB_Node(NodeMixin):
     input_file : str = ""
     gneb_workflow_log_file : str = ""
     current_energy_path = object()
-    n_iterations_check = 1000
-    total_iterations = 0
+    n_iterations_check  = 5000
+    n_checks_save       = 3
+    total_iterations    = 0
     intermediate_minima = []
 
-    target_noi = 10
+    target_noi  = 10
+    convergence = 1e-6
 
     state_prepare_callback = None
     gneb_step_callback = None
@@ -109,12 +111,14 @@ class GNEB_Node(NodeMixin):
 
             # Copy the other attributes
             self.children[-1].target_noi             = self.target_noi
+            self.children[-1].convergence            = self.convergence
             self.children[-1].state_prepare_callback = self.state_prepare_callback
             self.children[-1].gneb_step_callback     = self.gneb_step_callback
             self.children[-1].exit_callback          = self.exit_callback
             self.children[-1].before_gneb_callback   = self.before_gneb_callback
             self.children[-1].before_llg_callback    = self.before_llg_callback
             self.children[-1].n_iterations_check     = self.n_iterations_check
+            self.children[-1].n_checks_save          = self.n_checks_save
 
         chain_filename_list = [c.chain_file for c in self.children]
         chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
@@ -153,21 +157,23 @@ class GNEB_Node(NodeMixin):
                 self.before_gneb_callback(self, p_state)
 
             try:
+                n_checks = 0
                 while(len(self.intermediate_minima) == 0 and not self._converged):
                     info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
                     self.current_energy_path = energy_path_from_p_state(p_state)
                     self.check_for_minima()
-
+                    n_checks += 1
                     self.total_iterations += info.total_iterations
 
                     self.log("Total iterations = {}".format(self.total_iterations))
                     self.log("      max.torque = {}".format(info.max_torque))
                     self.log("      ips        = {}".format(info.total_ips))
 
-                    self._converged = info.max_torque < 1e-7
-
+                    self._converged = info.max_torque < self.convergence
                     if(self.gneb_step_callback):
                         self.gneb_step_callback(self, p_state)
+                    if(n_checks % self.n_checks_save == 0):
+                        self.save_chain()
             except KeyboardInterrupt as e:
                 self.log("Interrupt during run loop")
                 self.save_chain(p_state)
