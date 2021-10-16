@@ -15,6 +15,7 @@ from datetime import datetime
 class GNEB_Node(NodeMixin):
 
     chain_file : str = ""
+    initial_chain_file : str = ""
     input_file : str = ""
     gneb_workflow_log_file : str = ""
     current_energy_path = object()
@@ -45,6 +46,8 @@ class GNEB_Node(NodeMixin):
         if(initial_chain_file):
             if not os.path.exists(initial_chain_file):
                 raise Exception("Initial chain file does not exist!")
+            self.initial_chain_file = output_folder + "/root_initial_chain.ovf"
+            shutil.copyfile(initial_chain_file, self.initial_chain_file)
             shutil.copyfile(initial_chain_file, self.chain_file)
 
         self.input_file = input_file
