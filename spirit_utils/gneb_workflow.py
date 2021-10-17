@@ -25,7 +25,7 @@ class GNEB_Node(NodeMixin):
     intermediate_minima = []
 
     target_noi  = 10
-    convergence = 1e-6
+    convergence = 1e-5
 
     state_prepare_callback = None
     gneb_step_callback = None
