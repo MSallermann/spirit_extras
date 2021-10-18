@@ -117,11 +117,24 @@ class energy_path:
     interpolated_total_energy = []
     interpolated_energy_contributions = {}
 
+    def split(self, idx_0, idx_1):
+        #TODO: interpolated quantities
+        split_path = energy_path()
+        split_path.reaction_coordinate = np.array(self.reaction_coordinate[idx_0:idx_1])
+        split_path.total_energy        = np.array(self.total_energy[idx_0:idx_1])
+        return split_path
+
+    def barrier(self):
+        return np.max(self.total_energy) - self.total_energy[0]
+
 def energy_path_from_p_state(p_state):
+    #TODO: contributions
     from spirit import chain
     result = energy_path()
     result.reaction_coordinate              = chain.get_reaction_coordinate(p_state)
     result.total_energy                     = chain.get_energy(p_state)
     result.interpolated_reaction_coordinate = chain.get_reaction_coordinate_interpolated(p_state)
     result.interpolated_total_energy        = chain.get_energy_interpolated(p_state)
+
+
     return result
