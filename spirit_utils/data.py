@@ -136,5 +136,4 @@ def energy_path_from_p_state(p_state):
     result.interpolated_reaction_coordinate = chain.get_reaction_coordinate_interpolated(p_state)
     result.interpolated_total_energy        = chain.get_energy_interpolated(p_state)
 
-
     return result
