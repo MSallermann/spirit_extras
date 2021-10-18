@@ -34,6 +34,7 @@ class GNEB_Node(NodeMixin):
     before_llg_callback = None
 
     output_folder = ""
+    output_tag = ""
 
     _converged = False
 
@@ -74,7 +75,7 @@ class GNEB_Node(NodeMixin):
     def log(self, message):
         now = datetime.now()
         current_time = now.strftime("%m/%d/%Y, %H:%M:%S")
-        log_string = "{} [{:^20}] : {}".format(current_time, self.name, message)
+        log_string = "{} [{:^35}] : {}".format(current_time, self.name, message)
         with open(self.gneb_workflow_log_file, "a") as f:
             print(log_string, file=f)
 
@@ -106,7 +107,7 @@ class GNEB_Node(NodeMixin):
             # Attributes that change due to tree structure
             child_name          = self.name + "_{}".format(len(self.children))
             child_input_file    = self.input_file
-            child_output_folder = self.output_folder + "/{}".format( len(self.children))
+            child_output_folder = self.output_folder + "/{}".format(len(self.children))
             self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
 
             # Copy the other attributes
@@ -127,75 +128,82 @@ class GNEB_Node(NodeMixin):
         """ 
         """
 
-        self.log("Running")
+        try:
+            self.log("Running")
 
-        from spirit import state, simulation, io, transition, chain
+            from spirit import state, simulation, io, transition, chain
 
-        with state.State(self.input_file) as p_state:
-            set_output_folder(p_state, self.output_folder)
+            with state.State(self.input_file) as p_state:
+                set_output_folder(p_state, self.output_folder, self.output_tag)
 
-            if self.state_prepare_callback:
-                self.state_prepare_callback(self, p_state)
+                if self.state_prepare_callback:
+                    self.state_prepare_callback(self, p_state)
 
-            if not os.path.exists(self.chain_file):
-                raise Exception("Chain file does not exist!")
+                if not os.path.exists(self.chain_file):
+                    raise Exception("Chain file does not exist!")
 
-            io.chain_read(p_state, self.chain_file)
-            noi = chain.get_noi(p_state)
-
-            if(noi <= self.target_noi):
-                self.log("Too few images ({}). Inserting additional interpolated images".format(noi))
-
-            while(noi <= self.target_noi):
-                transition.homogeneous_insert_interpolated(p_state, 1)
+                io.chain_read(p_state, self.chain_file)
                 noi = chain.get_noi(p_state)
 
-            self.log("Number of images = {}".format(noi))
+                if(noi <= self.target_noi):
+                    self.log("Too few images ({}). Inserting additional interpolated images".format(noi))
 
-            self.current_energy_path = energy_path_from_p_state(p_state)
-            if self.before_gneb_callback:
-                self.before_gneb_callback(self, p_state)
+                while(noi <= self.target_noi):
+                    transition.homogeneous_insert_interpolated(p_state, 1)
+                    noi = chain.get_noi(p_state)
 
-            try:
-                n_checks = 0
-                while(len(self.intermediate_minima) == 0 and not self._converged):
-                    info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
-                    self.current_energy_path = energy_path_from_p_state(p_state)
-                    self.check_for_minima()
-                    n_checks += 1
-                    self.total_iterations += info.total_iterations
+                self.log("Number of images = {}".format(noi))
 
-                    self.log("Total iterations = {}".format(self.total_iterations))
-                    self.log("      max.torque = {}".format(info.max_torque))
-                    self.log("      ips        = {}".format(info.total_ips))
+                self.current_energy_path = energy_path_from_p_state(p_state)
+                if self.before_gneb_callback:
+                    self.before_gneb_callback(self, p_state)
 
-                    self._converged = info.max_torque < self.convergence
-                    if(self.gneb_step_callback):
-                        self.gneb_step_callback(self, p_state)
-                    if(n_checks % self.n_checks_save == 0):
-                        self.save_chain()
-            except KeyboardInterrupt as e:
-                self.log("Interrupt during run loop")
-                self.save_chain(p_state)
+                try:
+                    n_checks = 0
+                    while(len(self.intermediate_minima) == 0 and not self._converged):
+
+                        info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
+
+                        self.current_energy_path = energy_path_from_p_state(p_state)
+                        self.check_for_minima()
+                        n_checks += 1
+                        self.total_iterations += info.total_iterations
+
+                        self.log("Total iterations = {}".format(self.total_iterations))
+                        self.log("      max.torque = {}".format(info.max_torque))
+                        self.log("      ips        = {}".format(info.total_ips))
+
+                        self._converged = info.max_torque < self.convergence
+                        if(self.gneb_step_callback):
+                            self.gneb_step_callback(self, p_state)
+                        if(n_checks % self.n_checks_save == 0):
+                            self.save_chain(p_state)
+                except KeyboardInterrupt as e:
+                    self.log("Interrupt during run loop")
+                    self.save_chain(p_state)
+                    if(self.exit_callback):
+                        self.exit_callback(self, p_state)
+                    raise e
+
+                self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
+                if self.before_llg_callback:
+                    self.before_llg_callback(self, p_state)
+
+                self.log("Relaxing intermediate minima")
+                for idx_minimum in self.intermediate_minima:
+                    simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
+
                 if(self.exit_callback):
                     self.exit_callback(self, p_state)
-                raise e
 
-            self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
-            if self.before_llg_callback:
-                self.before_llg_callback(self, p_state)
+                self.save_chain(p_state)
 
-            self.log("Relaxing intermediate minima")
-            for idx_minimum in self.intermediate_minima:
-                simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
+                if not self._converged:
+                    self.spawn_children(p_state)
+                    self.children[0].run()
+                else:
+                    self.log("Converged!")
 
-            if(self.exit_callback):
-                self.exit_callback(self, p_state)
-
-            self.save_chain(p_state)
-
-            if not self._converged:
-                self.spawn_children(p_state)
-                self.children[0].run()
-            else:
-                self.log("Converged!")
+        except Exception as e:
+            self.log("Exception during 'run': {}".format(str(e))) # Log the exception and re-raise
+            raise e
