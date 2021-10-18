@@ -5,6 +5,8 @@ import os
 import shutil
 import copy
 
+import traceback
+
 from numpy import inf
 
 from .data import energy_path, energy_path_from_p_state
@@ -14,9 +16,9 @@ from datetime import datetime
 
 class GNEB_Node(NodeMixin):
 
-    chain_file : str = ""
-    initial_chain_file : str = ""
-    input_file : str = ""
+    chain_file : str             = ""
+    initial_chain_file : str     = ""
+    input_file : str             = ""
     gneb_workflow_log_file : str = ""
     current_energy_path = object()
     n_iterations_check  = 5000
@@ -110,6 +112,8 @@ class GNEB_Node(NodeMixin):
             child_output_folder = self.output_folder + "/{}".format(len(self.children))
             self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
 
+            self.children[-1].current_energy_path = self.current_energy_path.split(i1, i2+1)
+
             # Copy the other attributes
             self.children[-1].target_noi             = self.target_noi
             self.children[-1].convergence            = self.convergence
@@ -172,12 +176,14 @@ class GNEB_Node(NodeMixin):
                         self.log("Total iterations = {}".format(self.total_iterations))
                         self.log("      max.torque = {}".format(info.max_torque))
                         self.log("      ips        = {}".format(info.total_ips))
+                        self.log("      Delta E    = {}".format(self.current_energy_path.barrier()))
 
                         self._converged = info.max_torque < self.convergence
                         if(self.gneb_step_callback):
                             self.gneb_step_callback(self, p_state)
                         if(n_checks % self.n_checks_save == 0):
                             self.save_chain(p_state)
+
                 except KeyboardInterrupt as e:
                     self.log("Interrupt during run loop")
                     self.save_chain(p_state)
@@ -203,10 +209,19 @@ class GNEB_Node(NodeMixin):
                 else:
                     self.log("Converged!")
                 # p_state gets deleted here
-            for c in self.children:
-                c.run()
+
+            # The following list determines the order in which we run the children of this node.
+            # We sort the run from largest to smallest energy barrier (hence the minus).
+            # We do this to explore the most 'interesting' paths first
+            idx_children_run_order = list(range(len(self.children)))
+            idx_children_run_order.sort(key = lambda i : -self.children[i].current_energy_path.barrier())
+
+            for i in idx_children_run_order:
+                self.children[i].run()
+
             self.log("Finished!")
 
         except Exception as e:
             self.log("Exception during 'run': {}".format(str(e))) # Log the exception and re-raise
+            self.log(traceback.format_exc())
             raise e
