@@ -200,9 +200,11 @@ class GNEB_Node(NodeMixin):
 
                 if not self._converged:
                     self.spawn_children(p_state)
-                    self.children[0].run()
                 else:
                     self.log("Converged!")
+
+                for c in self.children:
+                    c.run()
 
         except Exception as e:
             self.log("Exception during 'run': {}".format(str(e))) # Log the exception and re-raise
