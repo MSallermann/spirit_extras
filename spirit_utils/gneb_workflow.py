@@ -28,15 +28,15 @@ class GNEB_Node(NodeMixin):
     convergence = 1e-5
 
     state_prepare_callback = None
-    gneb_step_callback = None
-    exit_callback = None
-    before_gneb_callback = None
-    before_llg_callback = None
+    gneb_step_callback     = None
+    exit_callback          = None
+    before_gneb_callback   = None
+    before_llg_callback    = None
 
     output_folder = ""
-    output_tag = ""
+    output_tag    = ""
 
-    _converged = False
+    _converged    = False
 
     def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
 
@@ -202,9 +202,10 @@ class GNEB_Node(NodeMixin):
                     self.spawn_children(p_state)
                 else:
                     self.log("Converged!")
-
-                for c in self.children:
-                    c.run()
+                # p_state gets deleted here
+            for c in self.children:
+                c.run()
+            self.log("Finished!")
 
         except Exception as e:
             self.log("Exception during 'run': {}".format(str(e))) # Log the exception and re-raise
