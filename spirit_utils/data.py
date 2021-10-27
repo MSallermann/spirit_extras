@@ -17,9 +17,23 @@ class Spin_System:
         return sliced_spin_system
 
     def copy(self):
+        """Make a shallow copy of spin_system"""
+        copy = Spin_System()
+        copy.positions       = self.positions # This will create a copy of the 'metadata' like shape, but not the underlying field
+        copy.spins           = self.spins # This will create a copy of the 'metadata' like shape, but not the underlying field
+        copy.n_cell_atoms    = self.n_cell_atoms
+        copy.n_cells         = np.array(self.n_cells)
+        copy.basis           = np.array(self.basis)
+        copy.bravais_vectors = np.array(self.bravais_vectors)
+        copy.unordered       = self.unordered
+        return copy
+
+    def deepcopy(self):
+        """Make a deep copy of spin system"""
         copy = Spin_System()
         copy.positions       = np.array(self.positions)
         copy.spins           = np.array(self.spins)
+        copy.n_cell_atoms    = self.n_cell_atoms
         copy.n_cells         = np.array(self.n_cells)
         copy.basis           = np.array(self.basis)
         copy.bravais_vectors = np.array(self.bravais_vectors)
@@ -27,77 +41,74 @@ class Spin_System:
         return copy
 
     def is_flat(self):
+        """Return true if spin_system is flat"""
         return len(self.positions.shape) == 2
 
     def flatten(self):
+        """Flatten the spin system"""
         self.positions = np.reshape(self.positions, (self.nos(),3), order="F")
         self.spins     = np.reshape(self.spins, (self.nos(),3), order="F")
-        return self
+
+    def flattened(self):
+        """Return a flattend view into the spin system"""
+        if self.is_flat():
+            return self
+        else:
+            temp = self.copy()
+            temp.positions = np.reshape(self.positions, (self.nos(),3), order="F")
+            temp.spins     = np.reshape(self.spins, (self.nos(),3), order="F")
+            return temp
 
     def shape(self):
+        """Shape the spin system"""
+        if self.unordered:
+            raise Exception("Cannot shape an unordered system")
+
         self.positions = np.reshape(self.positions, (self.n_cell_atoms, self.n_cells[0], self.n_cells[1], self.n_cells[2], 3), order="F")
         self.spins     = np.reshape(self.spins, (self.n_cell_atoms, self.n_cells[0], self.n_cells[1], self.n_cells[2], 3), order="F")
-        return self
+
+    def shaped(self):
+        """Return a shaped view into the spin system"""
+        if self.unordered:
+            raise Exception("Cannot shape an unordered system")
+
+        if not self.is_flat():
+            return self
+        else:
+            temp = self.copy()
+            temp.positions = np.reshape(self.positions, (self.n_cell_atoms, self.n_cells[0], self.n_cells[1], self.n_cells[2], 3), order="F")
+            temp.spins     = np.reshape(self.spins, (self.n_cell_atoms, self.n_cells[0], self.n_cells[1], self.n_cells[2], 3), order="F")
+            return temp
 
     def nos(self):
         return self.n_cells[0] * self.n_cells[1] * self.n_cells[2] * self.n_cell_atoms
 
     def center(self):
-        was_flat = self.is_flat()
-        if not was_flat:
-            self.flatten()
-        center =  np.mean(self.positions, axis=0)
-        if not was_flat:
-            self.shape()
-        return center
+        return np.mean(self.flattened().positions, axis=0)
 
     def a_slice(self, val):
-        was_flat = self.is_flat()
-        if was_flat:
-            self.shape()
-
-        result = self[:,val,:,:,:]
-        result.n_cells = [1, self.n_cells[1], self.n_cells[2]]
+        result                 = self.shaped()[:,val,:,:,:]
+        result.n_cells         = [1, self.n_cells[1], self.n_cells[2]]
         result.bravais_vectors = self.bravais_vectors
-        result.n_cell_atoms = self.n_cell_atoms
-        result.unordered = False
-
-        if was_flat:
-            self.flatten()
-
-        return result.flatten()
+        result.n_cell_atoms    = self.n_cell_atoms
+        result.unordered       = False
+        return result.flattened()
 
     def b_slice(self, val):
-        was_flat = self.is_flat()
-        if was_flat:
-            self.shape()
-
-        result = self[:,:,val,:,:]
-        result.n_cells = [self.n_cells[0], 1, self.n_cells[2]]
+        result                 = self.shaped()[:,:,val,:,:]
+        result.n_cells         = [self.n_cells[0], 1, self.n_cells[2]]
         result.bravais_vectors = self.bravais_vectors
-        result.n_cell_atoms = self.n_cell_atoms
-        result.unordered = False
-
-        if was_flat:
-            self.flatten()
-
-        return result.flatten()
+        result.n_cell_atoms    = self.n_cell_atoms
+        result.unordered       = False
+        return result.flattened()
 
     def c_slice(self, val):
-        was_flat = self.is_flat()
-        if was_flat:
-            self.shape()
-
-        result = self[:,:,:,val,:]
-        result.n_cells = [self.n_cells[0], self.n_cells[1], 1]
+        result                 = self.shaped()[:,:,:,val,:]
+        result.n_cells         = [self.n_cells[0], self.n_cells[1], 1]
         result.bravais_vectors = self.bravais_vectors
-        result.n_cell_atoms = self.n_cell_atoms
-        result.unordered = False
-
-        if was_flat:
-            self.shape()
-
-        return result.flatten()
+        result.n_cell_atoms    = self.n_cell_atoms
+        result.unordered       = False
+        return result.flattened()
 
 def spin_system_from_p_state(p_state, copy=False):
     from spirit import geometry, system
