@@ -42,13 +42,17 @@ class GNEB_Node(NodeMixin):
     _converged    = False
 
     def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
+        """Constructor."""
 
+        # Create output folder
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
         self.output_folder = output_folder
 
+        # The current chain is always saved here
         self.chain_file = output_folder + "/chain.ovf"
 
+        # If an initial chain is specified we copy it to the output folder
         if(initial_chain_file):
             if not os.path.exists(initial_chain_file):
                 raise Exception("Initial chain file does not exist!")
@@ -57,15 +61,19 @@ class GNEB_Node(NodeMixin):
             shutil.copyfile(initial_chain_file, self.chain_file)
 
         self.input_file = input_file
-        self.name = name
-        self.parent = parent
+        self.name       = name
+        self.parent     = parent
+
+        # If no log file has been specified we put one in the output folder
         if not gneb_workflow_log_file:
             self.gneb_workflow_log_file = self.output_folder + "/workflow_log.txt"
         else:
             self.gneb_workflow_log_file = gneb_workflow_log_file
+
         if children:
             self.children = children
 
+        # Log the node creation
         creation_msg = "Creating new GNEB_Node '{}'".format(name)
         if(parent):
             creation_msg += ", parent '{}'".format(parent.name)
@@ -124,10 +132,13 @@ class GNEB_Node(NodeMixin):
         # Instantiate the GNEB nodes
         noi = chain.get_noi(p_state)
 
+        # Creates a list of all indices that would be start/end points of new chains
         idx_list = [0, *self.intermediate_minima, noi-1]
 
+        # From the previous list, creates a list of pairs of start/end points
         idx_pair_list = [ (idx_list[i], idx_list[i+1]) for i in range(len(idx_list)-1) ]
 
+        # First create all the instances of GNEB nodes
         for i1,i2 in idx_pair_list:
             # Attributes that change due to tree structure
             child_name          = self.name + "_{}".format(len(self.children))
@@ -148,11 +159,13 @@ class GNEB_Node(NodeMixin):
             self.children[-1].n_iterations_check     = self.n_iterations_check
             self.children[-1].n_checks_save          = self.n_checks_save
 
+        # Then we write their respective chain.ovf files
         chain_filename_list = [c.chain_file for c in self.children]
         chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
 
 
-    def run_children(self, p_state):
+    def run_children(self):
+        """Exectue the run loop on all children"""
         # The following list determines the order in which we run the children of this node.
         # We sort the run from largest to smallest energy barrier (hence the minus).
         # We do this to explore the most 'interesting' paths first
@@ -217,41 +230,47 @@ class GNEB_Node(NodeMixin):
         """Returns True if the run loop should be continued."""
         return (not self._converged) and (len(self.intermediate_minima) <= 0)
 
-
     def run(self):
         """Run GNEB with checks after a certain number of iterations"""
 
         try:
             self.log("Running")
 
-            from spirit import state, simulation, io, transition, chain
+            from spirit import state, simulation, io
 
             with state.State(self.input_file) as p_state:
+                # Set the output folder for the files created by spirit
                 set_output_folder(p_state, self.output_folder, self.output_tag)
 
+                # The state prepare callback can be used to change the state before execution of any other commands
+                # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
                 if self.state_prepare_callback:
                     self.state_prepare_callback(self, p_state)
 
+                # Before we run we must make sure that the chain.ovf file exists now
                 if not os.path.exists(self.chain_file):
                     raise Exception("Chain file does not exist!")
 
+                # Read the file, increase up to at leas target_noi and update the energy_path (for plotting etc.)
                 io.chain_read(p_state, self.chain_file)
                 self.increase_noi(p_state)
                 self.update_energy_path(p_state)
 
+                # Another callback at whicht the chain actually exists now, theoretically one could set image types here
                 if self.before_gneb_callback:
                     self.before_gneb_callback(self, p_state)
 
                 try:
-                    n_checks = 0
+                    n_checks = 0 
                     while(self.check_run_condition()):
 
                         info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
                         self.update_energy_path(p_state)
-                        self.check_for_minima()
+                        self.check_for_minima() # Writes the intermediate minima list
                         n_checks += 1
                         self.total_iterations += info.total_iterations
 
+                        # Log some information
                         self.log("Total iterations = {}".format(self.total_iterations))
                         self.log("      max.torque = {}".format(info.max_torque))
                         self.log("      ips        = {}".format(info.total_ips))
@@ -259,11 +278,15 @@ class GNEB_Node(NodeMixin):
 
                         self._converged = info.max_torque < self.convergence
 
+                        # Step callback to e.g plot chains
                         if(self.gneb_step_callback):
                             self.gneb_step_callback(self, p_state)
+
+                        # Save the chain periodically
                         if(n_checks % self.n_checks_save == 0):
                             self.save_chain(p_state)
 
+                        # Rebalancing
                         self.chain_rebalance(p_state)
 
                 except KeyboardInterrupt as e:
@@ -288,9 +311,8 @@ class GNEB_Node(NodeMixin):
                 self.save_chain(p_state)
 
                 self.spawn_children(p_state)
-                self.run_children(p_state)
-                # p_state gets deleted here
-
+                # p_state gets deleted here, it does not have to persist to run the child nodes
+            self.run_children()
             self.log("Finished!")
 
         except Exception as e:
