@@ -131,6 +131,37 @@ class GNEB_Node(NodeMixin):
         chain_filename_list = [c.chain_file for c in self.children]
         chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
 
+    def chain_rebalance(self, p_state, tol=0.25):
+        """Tries to rebalance the chain while keeping the number of images constant. The closer tol is to zero, the more aggressive the rebalancing."""
+        import numpy as np
+        from spirit import chain, transition
+        from spirit.parameters import gneb
+        noi = chain.get_noi(p_state)
+
+        idx_max  = np.argmax(self.current_energy_path.total_energy)
+
+        delta_Rx   = [ self.current_energy_path.reaction_coordinate[i+1] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-1) ]
+        delta_Rx_2 = [ self.current_energy_path.reaction_coordinate[i+2] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-2) ]
+        max_delta_Rx  = np.max(delta_Rx)
+        min_delta_Rx2 = np.min(delta_Rx_2)
+
+        if max_delta_Rx > (1 + np.abs(tol)) * min_delta_Rx2:
+            self.log("Rebalancing chain")
+            self.log("      Max. Delta Rx {}, Min. Delta Rx2 {}".format(max_delta_Rx, min_delta_Rx2))
+            idx   = np.argmax(delta_Rx)
+            idx_2 = np.argmin(delta_Rx_2)
+            self.log("      Inserting after idx {}, deleting idx {}".format(idx, idx_2+1))
+
+            # Delete the image that was too densely spaced. this will shift all indices greater than idx_2+1
+            chain.delete_image(p_state, idx_image = idx_2+1)
+
+            # Correct the index if necessary
+            if(idx > idx_2+1) < idx:
+                idx -= 1
+
+            chain.insert_image_after(p_state, idx)
+            transition.homogeneous(p_state, idx, idx+2)
+
     def run(self):
         """ 
         """
