@@ -15,6 +15,7 @@ from .chain_io import chain_write_split_at
 from datetime import datetime
 
 class GNEB_Node(NodeMixin):
+    """A class that represents a GNEB calculation on a single chain. Can spawn children if cutting of the chain becomes necessary."""
 
     chain_file : str             = ""
     initial_chain_file : str     = ""
@@ -75,6 +76,7 @@ class GNEB_Node(NodeMixin):
         self.log(creation_msg)
 
     def log(self, message):
+        """Append a message with date/time information to the log file."""
         now = datetime.now()
         current_time = now.strftime("%m/%d/%Y, %H:%M:%S")
         log_string = "{} [{:^35}] : {}".format(current_time, self.name, message)
@@ -82,21 +84,39 @@ class GNEB_Node(NodeMixin):
             print(log_string, file=f)
 
     def update_energy_path(self, p_state):
+        """Updates the current energy path."""
         self.current_energy_path = energy_path_from_p_state(p_state)
 
-    def check_for_minima(self):
+    def check_for_minima(self, tol=0.05):
+        """
+           Checks the chain for intermediate minima. Tol controls how sensitive this check is, lower tol means more sensitive. 
+           E.g a tol of 0.1 means that the minimum energy difference between the image in question and any 
+           of the two neighbouring images has to be larger than 10% of the images energy to count as an intermediate minimumg.
+           Default tol = 0.05
+        """
         self.intermediate_minima = []
         e = self.current_energy_path.total_energy
         for i in range(1, len(e) - 1): # Leave out the first and the last energy
             if(e[i-1] > e[i] and e[i+1] > e[i] ):
-                self.intermediate_minima.append(i)
+                
+                if(min(e[i-1] - e[i], e[i+1] - e[i]) > abs(tol) * e[i] ):
+                    self.intermediate_minima.append(i)
+
+        if(len(self.intermediate_minima) > 0):
+            self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
 
     def save_chain(self, p_state):
+        """Saves the chain and overwrites the chain_file"""
         from spirit import io
         self.log("Writing chain to {}".format(self.chain_file))
         io.chain_write(p_state, self.chain_file)
 
     def spawn_children(self, p_state):
+        """Creates child nodes"""
+        if self._converged:
+            self.log("Converged!")
+            return
+
         self.log("Spawning children")
 
         from spirit import chain
@@ -131,6 +151,19 @@ class GNEB_Node(NodeMixin):
         chain_filename_list = [c.chain_file for c in self.children]
         chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
 
+
+    def run_children(self, p_state):
+        # The following list determines the order in which we run the children of this node.
+        # We sort the run from largest to smallest energy barrier (hence the minus).
+        # We do this to explore the most 'interesting' paths first
+
+        idx_children_run_order = list(range(len(self.children)))
+        idx_children_run_order.sort(key = lambda i : -self.children[i].current_energy_path.barrier())
+
+        for i in idx_children_run_order:
+            self.children[i].run()
+
+
     def chain_rebalance(self, p_state, tol=0.25):
         """Tries to rebalance the chain while keeping the number of images constant. The closer tol is to zero, the more aggressive the rebalancing."""
         import numpy as np
@@ -162,9 +195,31 @@ class GNEB_Node(NodeMixin):
             chain.insert_image_after(p_state, idx)
             transition.homogeneous(p_state, idx, idx+2)
 
+    def increase_noi(self, p_state, target_noi=None):
+        """Increases the noi by (roughly) a factor of two until the number of images is at least as large as target_noi"""
+        from spirit import chain, transition
+
+        if not target_noi:
+            target_noi = self.target_noi
+
+        noi = chain.get_noi(p_state)
+
+        if(noi <= self.target_noi):
+            self.log("Too few images ({}). Inserting additional interpolated images".format(noi))
+
+        while(noi <= self.target_noi):
+            transition.homogeneous_insert_interpolated(p_state, 1)
+            noi = chain.get_noi(p_state)
+
+        self.log("Number of images = {}".format(noi))
+
+    def check_run_condition(self):
+        """Returns True if the run loop should be continued."""
+        return (not self._converged) and (len(self.intermediate_minima) <= 0)
+
+
     def run(self):
-        """ 
-        """
+        """Run GNEB with checks after a certain number of iterations"""
 
         try:
             self.log("Running")
@@ -181,24 +236,15 @@ class GNEB_Node(NodeMixin):
                     raise Exception("Chain file does not exist!")
 
                 io.chain_read(p_state, self.chain_file)
-                noi = chain.get_noi(p_state)
-
-                if(noi <= self.target_noi):
-                    self.log("Too few images ({}). Inserting additional interpolated images".format(noi))
-
-                while(noi <= self.target_noi):
-                    transition.homogeneous_insert_interpolated(p_state, 1)
-                    noi = chain.get_noi(p_state)
-
-                self.log("Number of images = {}".format(noi))
-
+                self.increase_noi(p_state)
                 self.update_energy_path(p_state)
+
                 if self.before_gneb_callback:
                     self.before_gneb_callback(self, p_state)
 
                 try:
                     n_checks = 0
-                    while(len(self.intermediate_minima) == 0 and not self._converged):
+                    while(self.check_run_condition()):
 
                         info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
                         self.update_energy_path(p_state)
@@ -212,10 +258,13 @@ class GNEB_Node(NodeMixin):
                         self.log("      Delta E    = {}".format(self.current_energy_path.barrier()))
 
                         self._converged = info.max_torque < self.convergence
+
                         if(self.gneb_step_callback):
                             self.gneb_step_callback(self, p_state)
                         if(n_checks % self.n_checks_save == 0):
                             self.save_chain(p_state)
+
+                        self.chain_rebalance(p_state)
 
                 except KeyboardInterrupt as e:
                     self.log("Interrupt during run loop")
@@ -224,7 +273,6 @@ class GNEB_Node(NodeMixin):
                         self.exit_callback(self, p_state)
                     raise e
 
-                self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
                 if self.before_llg_callback:
                     self.before_llg_callback(self, p_state)
 
@@ -239,20 +287,9 @@ class GNEB_Node(NodeMixin):
 
                 self.save_chain(p_state)
 
-                if not self._converged:
-                    self.spawn_children(p_state)
-                else:
-                    self.log("Converged!")
+                self.spawn_children(p_state)
+                self.run_children(p_state)
                 # p_state gets deleted here
-
-            # The following list determines the order in which we run the children of this node.
-            # We sort the run from largest to smallest energy barrier (hence the minus).
-            # We do this to explore the most 'interesting' paths first
-            idx_children_run_order = list(range(len(self.children)))
-            idx_children_run_order.sort(key = lambda i : -self.children[i].current_energy_path.barrier())
-
-            for i in idx_children_run_order:
-                self.children[i].run()
 
             self.log("Finished!")
 
