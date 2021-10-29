@@ -81,6 +81,9 @@ class GNEB_Node(NodeMixin):
         with open(self.gneb_workflow_log_file, "a") as f:
             print(log_string, file=f)
 
+    def update_energy_path(self, p_state):
+        self.current_energy_path = energy_path_from_p_state(p_state)
+
     def check_for_minima(self):
         self.intermediate_minima = []
         e = self.current_energy_path.total_energy
@@ -158,7 +161,7 @@ class GNEB_Node(NodeMixin):
 
                 self.log("Number of images = {}".format(noi))
 
-                self.current_energy_path = energy_path_from_p_state(p_state)
+                self.update_energy_path(p_state)
                 if self.before_gneb_callback:
                     self.before_gneb_callback(self, p_state)
 
@@ -167,8 +170,7 @@ class GNEB_Node(NodeMixin):
                     while(len(self.intermediate_minima) == 0 and not self._converged):
 
                         info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
-
-                        self.current_energy_path = energy_path_from_p_state(p_state)
+                        self.update_energy_path(p_state)
                         self.check_for_minima()
                         n_checks += 1
                         self.total_iterations += info.total_iterations
@@ -198,6 +200,8 @@ class GNEB_Node(NodeMixin):
                 self.log("Relaxing intermediate minima")
                 for idx_minimum in self.intermediate_minima:
                     simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
+
+                self.update_energy_path(p_state)
 
                 if(self.exit_callback):
                     self.exit_callback(self, p_state)
