@@ -28,7 +28,7 @@ class GNEB_Node(NodeMixin):
     intermediate_minima = []
 
     target_noi  = 10
-    convergence = 1e-5
+    convergence = 1e-4
 
     state_prepare_callback = None
     gneb_step_callback     = None
@@ -40,6 +40,8 @@ class GNEB_Node(NodeMixin):
     output_tag    = ""
 
     _converged    = False
+
+    child_indices = []
 
     def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
         """Constructor."""
@@ -121,11 +123,12 @@ class GNEB_Node(NodeMixin):
 
     def spawn_children(self, p_state):
         """Creates child nodes"""
+
         if self._converged:
-            self.log("Converged!")
+            self.log("Converged")
             return
 
-        self.log("Spawning children")
+        self.log("Spawning children - splitting chain")
 
         from spirit import chain
 
@@ -136,10 +139,10 @@ class GNEB_Node(NodeMixin):
         idx_list = [0, *self.intermediate_minima, noi-1]
 
         # From the previous list, creates a list of pairs of start/end points
-        idx_pair_list = [ (idx_list[i], idx_list[i+1]) for i in range(len(idx_list)-1) ]
+        self.child_indices = [ (idx_list[i], idx_list[i+1]) for i in range(len(idx_list)-1) ]
 
         # First create all the instances of GNEB nodes
-        for i1,i2 in idx_pair_list:
+        for i1,i2 in self.child_indices:
             # Attributes that change due to tree structure
             child_name          = self.name + "_{}".format(len(self.children))
             child_input_file    = self.input_file
@@ -163,7 +166,6 @@ class GNEB_Node(NodeMixin):
         chain_filename_list = [c.chain_file for c in self.children]
         chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
 
-
     def run_children(self):
         """Exectue the run loop on all children"""
         # The following list determines the order in which we run the children of this node.
@@ -175,7 +177,6 @@ class GNEB_Node(NodeMixin):
 
         for i in idx_children_run_order:
             self.children[i].run()
-
 
     def chain_rebalance(self, p_state, tol=0.25):
         """Tries to rebalance the chain while keeping the number of images constant. The closer tol is to zero, the more aggressive the rebalancing."""
