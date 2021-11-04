@@ -134,6 +134,9 @@ class energy_path:
     interpolated_total_energy = []
     interpolated_energy_contributions = {}
 
+    def idx_sp(self):
+        return np.argmax(self.total_energy)
+
     def split(self, idx_0, idx_1):
         #TODO: interpolated quantities
         split_path = energy_path()

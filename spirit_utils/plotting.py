@@ -109,12 +109,12 @@ def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwa
     E0 = energy_path.total_energy[-1]
 
     if(len(energy_path.interpolated_reaction_coordinate) > 0):
-        Rx_int = energy_path.interpolated_reaction_coordinate
+        Rx_int = np.array(energy_path.interpolated_reaction_coordinate)
         if normalize_reaction_coordinate:
             Rx_int = Rx_int / Rx_int[-1]
         ax.plot(Rx_int, np.asarray(energy_path.interpolated_total_energy) - E0, **kwargs_interpolated )
 
-    Rx = energy_path.reaction_coordinate
+    Rx = np.array(energy_path.reaction_coordinate)
     if normalize_reaction_coordinate:
         Rx = Rx / Rx[-1]
     ax.plot(Rx, np.asarray(energy_path.total_energy) - E0, **kwargs_discrete)

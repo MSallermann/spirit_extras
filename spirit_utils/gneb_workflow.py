@@ -5,13 +5,14 @@ import os
 import shutil
 import copy
 
+import numpy as np
 import traceback
 
 from numpy import inf
 
 from .data import energy_path, energy_path_from_p_state
 from .util import set_output_folder
-from .chain_io import chain_write_split_at
+from .chain_io import chain_write_between, chain_write_split_at
 from datetime import datetime
 
 class GNEB_Node(NodeMixin):
@@ -28,20 +29,23 @@ class GNEB_Node(NodeMixin):
     intermediate_minima = []
 
     target_noi  = 10
+    noi = -1
     convergence = 1e-4
+    max_total_iterations = -1
 
+    output_folder = ""
+    output_tag    = ""
+
+    child_indices = []
+
+    allow_split = True
     state_prepare_callback = None
     gneb_step_callback     = None
     exit_callback          = None
     before_gneb_callback   = None
     before_llg_callback    = None
 
-    output_folder = ""
-    output_tag    = ""
-
     _converged    = False
-
-    child_indices = []
 
     def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
         """Constructor."""
@@ -109,7 +113,7 @@ class GNEB_Node(NodeMixin):
         for i in range(1, len(e) - 1): # Leave out the first and the last energy
             if(e[i-1] > e[i] and e[i+1] > e[i] ):
                 
-                if(min(e[i-1] - e[i], e[i+1] - e[i]) > abs(tol) * e[i] ):
+                if(abs(min(e[i-1] - e[i], e[i+1] - e[i])) > abs(tol * e[i]) ):
                     self.intermediate_minima.append(i)
 
         if(len(self.intermediate_minima) > 0):
@@ -124,8 +128,14 @@ class GNEB_Node(NodeMixin):
     def spawn_children(self, p_state):
         """Creates child nodes"""
 
+        if not self.allow_split:
+            return
+
         if self._converged:
             self.log("Converged")
+            return
+
+        if len(self.intermediate_minima) == 0:
             return
 
         self.log("Spawning children - splitting chain")
@@ -154,6 +164,7 @@ class GNEB_Node(NodeMixin):
             # Copy the other attributes
             self.children[-1].target_noi             = self.target_noi
             self.children[-1].convergence            = self.convergence
+            self.children[-1].max_total_iterations   = self.max_total_iterations
             self.children[-1].state_prepare_callback = self.state_prepare_callback
             self.children[-1].gneb_step_callback     = self.gneb_step_callback
             self.children[-1].exit_callback          = self.exit_callback
@@ -161,13 +172,14 @@ class GNEB_Node(NodeMixin):
             self.children[-1].before_llg_callback    = self.before_llg_callback
             self.children[-1].n_iterations_check     = self.n_iterations_check
             self.children[-1].n_checks_save          = self.n_checks_save
+            self.children[-1].allow_split            = self.allow_split
 
         # Then we write their respective chain.ovf files
         chain_filename_list = [c.chain_file for c in self.children]
         chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
 
     def run_children(self):
-        """Exectue the run loop on all children"""
+        """Execute the run loop on all children"""
         # The following list determines the order in which we run the children of this node.
         # We sort the run from largest to smallest energy barrier (hence the minus).
         # We do this to explore the most 'interesting' paths first
@@ -187,8 +199,8 @@ class GNEB_Node(NodeMixin):
 
         idx_max  = np.argmax(self.current_energy_path.total_energy)
 
-        delta_Rx   = [ self.current_energy_path.reaction_coordinate[i+1] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-1) ]
-        delta_Rx_2 = [ self.current_energy_path.reaction_coordinate[i+2] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-2) ]
+        delta_Rx      = [ self.current_energy_path.reaction_coordinate[i+1] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-1) ]
+        delta_Rx_2    = [ self.current_energy_path.reaction_coordinate[i+2] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-2) ]
         max_delta_Rx  = np.max(delta_Rx)
         min_delta_Rx2 = np.min(delta_Rx_2)
 
@@ -216,16 +228,16 @@ class GNEB_Node(NodeMixin):
         if not target_noi:
             target_noi = self.target_noi
 
-        noi = chain.get_noi(p_state)
+        self.noi = chain.get_noi(p_state)
 
-        if(noi <= self.target_noi):
-            self.log("Too few images ({}). Inserting additional interpolated images".format(noi))
+        if(self.noi < self.target_noi):
+            self.log("Too few images ({}). Inserting additional interpolated images".format(self.noi))
 
-        while(noi <= self.target_noi):
+        while(self.noi < self.target_noi):
             transition.homogeneous_insert_interpolated(p_state, 1)
-            noi = chain.get_noi(p_state)
+            self.noi = chain.get_noi(p_state)
 
-        self.log("Number of images = {}".format(noi))
+        self.log("Number of images = {}".format(self.noi))
 
     def check_run_condition(self):
         """Returns True if the run loop should be continued."""
@@ -288,7 +300,7 @@ class GNEB_Node(NodeMixin):
                             self.save_chain(p_state)
 
                         # Rebalancing
-                        self.chain_rebalance(p_state)
+                        # self.chain_rebalance(p_state)
 
                 except KeyboardInterrupt as e:
                     self.log("Interrupt during run loop")
@@ -300,6 +312,7 @@ class GNEB_Node(NodeMixin):
                 if self.before_llg_callback:
                     self.before_llg_callback(self, p_state)
 
+                if len(self.intermediate_minima) > 0:
                 self.log("Relaxing intermediate minima")
                 for idx_minimum in self.intermediate_minima:
                     simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
@@ -318,5 +331,83 @@ class GNEB_Node(NodeMixin):
 
         except Exception as e:
             self.log("Exception during 'run': {}".format(str(e))) # Log the exception and re-raise
+            self.log(traceback.format_exc())
+            raise e
+
+    def clamp_and_refine(self, convergence=None, max_total_iterations=None, mode="max", apply_ci=True):
+        """One step of clamp and refine algorithm"""
+
+        if not convergence:
+            convergence = self.convergence
+
+        if not max_total_iterations:
+            max_total_iterations = self.max_total_iterations
+
+        try:
+            from spirit import state
+            if(len(self.children) != 0): # If not a leaf node call recursively on children
+                for c in self.children:
+                    c.clamp_and_refine(convergence, max_total_iterations, mode)
+                return
+
+            try:
+                idx_max = int(mode)
+            except Exception as e:
+                if mode.lower() == "max":
+                    idx_max = self.current_energy_path.idx_sp()
+                elif mode.lower() == "cliff":
+                    grad = np.abs( np.array(self.current_energy_path.total_energy)[1:] - np.array(self.current_energy_path.total_energy)[:-1] )
+                    idx_max = np.argmax(grad)
+                else:
+                    raise Exception("Unknown mode")
+
+            self.log("Clamp and refine! mode = {}, idx = {}".format(mode, idx_max))
+
+            if(idx_max == 0 or idx_max == self.noi - 1):
+                self.log("Cannot clamp and refine, since idx_max (= {}) is either 0 or noi-1".format(idx_max))
+                return
+
+            child_name          = self.name + "_{}".format(len(self.children))
+            child_input_file    = self.input_file
+            child_output_folder = self.output_folder + "/{}".format(len(self.children))
+            self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
+
+            self.child_indices = [(idx_max-1, idx_max+1)]
+
+            self.children[-1].current_energy_path = self.current_energy_path.split(idx_max-1, idx_max+1)
+            self.children[-1].allow_split = False # Dont allow splitting for clamp and refine
+
+            # Copy the other attributes
+            self.children[-1].target_noi             = 5
+            self.children[-1].convergence            = convergence
+            self.children[-1].max_total_iterations   = max_total_iterations
+            self.children[-1].state_prepare_callback = self.state_prepare_callback
+            self.children[-1].gneb_step_callback     = self.gneb_step_callback
+            self.children[-1].exit_callback          = self.exit_callback
+
+            if apply_ci:
+                def before_gneb_cb(gnw, p_state):
+                    from spirit import parameters
+                    self.before_gneb_callback(gnw, p_state)
+                    gnw.log("Setting image type")
+                    parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=2)
+            else:
+                def before_gneb_cb(gnw, p_state):
+                    self.before_gneb_callback(gnw, p_state)
+
+            self.children[-1].before_gneb_callback   = before_gneb_cb
+            self.children[-1].before_llg_callback    = self.before_llg_callback
+            self.children[-1].n_iterations_check     = self.n_iterations_check
+            self.children[-1].n_checks_save          = self.n_checks_save
+
+            with state.State(self.input_file) as p_state:
+                from spirit import io
+                io.chain_read(p_state, self.chain_file)
+                chain_write_between(p_state, self.children[-1].chain_file, idx_max-1, idx_max+1)
+
+            self.run_children()
+
+        except Exception as e:
+            self.log("Exception during 'clamp_and_refine': {}".format(str(e))) # Log the exception and re-raise
             self.log(traceback.format_exc())
             raise e
