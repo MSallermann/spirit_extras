@@ -97,9 +97,30 @@ class GNEB_Node(NodeMixin):
         with open(self.gneb_workflow_log_file, "a") as f:
             print(log_string, file=f)
 
-    def update_energy_path(self, p_state):
-        """Updates the current energy path."""
+    def update_energy_path(self, p_state=None):
+        """Updates the current energy path. If p_state is given we just use that, otherwise we have to construct it first"""
+        if p_state:
         self.current_energy_path = energy_path_from_p_state(p_state)
+        else:
+            from spirit import state, io
+            with state.State(self.input_file) as p_state:
+                # Set the output folder for the files created by spirit
+                set_output_folder(p_state, self.output_folder, self.output_tag)
+
+                # The state prepare callback can be used to change the state before execution of any other commands
+                # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
+                if self.state_prepare_callback:
+                    self.state_prepare_callback(self, p_state)
+
+                # Before we run we must make sure that the chain.ovf file exists now
+                if not os.path.exists(self.chain_file):
+                    raise Exception("Chain file does not exist!")
+
+                # Read the file, increase up to at leas target_noi and update the energy_path (for plotting etc.)
+                io.chain_read(p_state, self.chain_file)
+                self.increase_noi(p_state)
+                self.update_energy_path(p_state)
+
 
     def check_for_minima(self, tol=0.05):
         """
@@ -125,6 +146,36 @@ class GNEB_Node(NodeMixin):
         self.log("Writing chain to {}".format(self.chain_file))
         io.chain_write(p_state, self.chain_file)
 
+    def add_child(self, p_state, i1, i2):
+        # Attributes that change due to tree structure
+        child_name          = self.name + "_{}".format(len(self.children))
+        child_input_file    = self.input_file
+        child_output_folder = self.output_folder + "/{}".format(len(self.children))
+        self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
+
+        self.children[-1].current_energy_path = self.current_energy_path.split(i1, i2+1)
+
+        # Copy the other attributes
+        self.children[-1].target_noi             = self.target_noi
+        self.children[-1].convergence            = self.convergence
+        self.children[-1].max_total_iterations   = self.max_total_iterations
+        self.children[-1].state_prepare_callback = self.state_prepare_callback
+        self.children[-1].gneb_step_callback     = self.gneb_step_callback
+        self.children[-1].exit_callback          = self.exit_callback
+        self.children[-1].before_gneb_callback   = self.before_gneb_callback
+        self.children[-1].before_llg_callback    = self.before_llg_callback
+        self.children[-1].n_iterations_check     = self.n_iterations_check
+        self.children[-1].n_checks_save          = self.n_checks_save
+        self.children[-1].allow_split            = self.allow_split
+
+        self.child_indices.append([i1, i2])
+
+        # Write the chain file
+        chain_write_between(p_state, self.children[-1].chain_file, i1, i2)
+
+        return self.children[-1] # Return a reference to the child that has just been added
+
+
     def spawn_children(self, p_state):
         """Creates child nodes"""
 
@@ -144,39 +195,14 @@ class GNEB_Node(NodeMixin):
 
         # Instantiate the GNEB nodes
         noi = chain.get_noi(p_state)
-
         # Creates a list of all indices that would be start/end points of new chains
         idx_list = [0, *self.intermediate_minima, noi-1]
-
         # From the previous list, creates a list of pairs of start/end points
-        self.child_indices = [ (idx_list[i], idx_list[i+1]) for i in range(len(idx_list)-1) ]
+        idx_pairs = [ (idx_list[i], idx_list[i+1]) for i in range(len(idx_list)-1) ]
 
         # First create all the instances of GNEB nodes
-        for i1,i2 in self.child_indices:
-            # Attributes that change due to tree structure
-            child_name          = self.name + "_{}".format(len(self.children))
-            child_input_file    = self.input_file
-            child_output_folder = self.output_folder + "/{}".format(len(self.children))
-            self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
-
-            self.children[-1].current_energy_path = self.current_energy_path.split(i1, i2+1)
-
-            # Copy the other attributes
-            self.children[-1].target_noi             = self.target_noi
-            self.children[-1].convergence            = self.convergence
-            self.children[-1].max_total_iterations   = self.max_total_iterations
-            self.children[-1].state_prepare_callback = self.state_prepare_callback
-            self.children[-1].gneb_step_callback     = self.gneb_step_callback
-            self.children[-1].exit_callback          = self.exit_callback
-            self.children[-1].before_gneb_callback   = self.before_gneb_callback
-            self.children[-1].before_llg_callback    = self.before_llg_callback
-            self.children[-1].n_iterations_check     = self.n_iterations_check
-            self.children[-1].n_checks_save          = self.n_checks_save
-            self.children[-1].allow_split            = self.allow_split
-
-        # Then we write their respective chain.ovf files
-        chain_filename_list = [c.chain_file for c in self.children]
-        chain_write_split_at(p_state, filename_list=chain_filename_list, idx_list=idx_list)
+        for i1,i2 in idx_pairs:
+            self.add_child(p_state, i1, i2)
 
     def run_children(self):
         """Execute the run loop on all children"""
@@ -185,7 +211,12 @@ class GNEB_Node(NodeMixin):
         # We do this to explore the most 'interesting' paths first
 
         idx_children_run_order = list(range(len(self.children)))
+
+        try:
         idx_children_run_order.sort(key = lambda i : -self.children[i].current_energy_path.barrier())
+        except Exception as e:
+            self.log("Could not sort children run order by energy barrier. Executing in order.")
+            idx_children_run_order = list(range(len(self.children)))
 
         for i in idx_children_run_order:
             self.children[i].run()
@@ -241,19 +272,24 @@ class GNEB_Node(NodeMixin):
 
     def check_run_condition(self):
         """Returns True if the run loop should be continued."""
-        return (not self._converged) and (len(self.intermediate_minima) <= 0)
+        return (not self._converged) and (len(self.intermediate_minima) <= 0) and (self.total_iterations < self.max_total_iterations or self.max_total_iterations < 0)
 
     def run(self):
         """Run GNEB with checks after a certain number of iterations"""
 
+        if(len(self.children) != 0): # If not a leaf node call recursively on children
+            self.run_children()
+            return
+
         try:
             self.log("Running")
 
-            from spirit import state, simulation, io
+            from spirit import state, simulation, io, parameters
 
             with state.State(self.input_file) as p_state:
                 # Set the output folder for the files created by spirit
                 set_output_folder(p_state, self.output_folder, self.output_tag)
+                parameters.gneb.set_convergence(p_state, self.convergence)
 
                 # The state prepare callback can be used to change the state before execution of any other commands
                 # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
@@ -334,8 +370,11 @@ class GNEB_Node(NodeMixin):
             self.log(traceback.format_exc())
             raise e
 
-    def clamp_and_refine(self, convergence=None, max_total_iterations=None, mode="max", apply_ci=True):
+    def clamp_and_refine(self, convergence=None, max_total_iterations=None, mode="max", apply_ci=True, target_noi=5):
         """One step of clamp and refine algorithm"""
+
+        if target_noi % 2 == 0:
+            raise Exception("target_noi must be uneven!")
 
         if not convergence:
             convergence = self.convergence
@@ -347,8 +386,10 @@ class GNEB_Node(NodeMixin):
             from spirit import state
             if(len(self.children) != 0): # If not a leaf node call recursively on children
                 for c in self.children:
-                    c.clamp_and_refine(convergence, max_total_iterations, mode)
+                    c.clamp_and_refine(convergence, max_total_iterations, mode, apply_ci, target_noi)
                 return
+
+            self.update_energy_path()
 
             try:
                 idx_max = int(mode)
@@ -367,43 +408,27 @@ class GNEB_Node(NodeMixin):
                 self.log("Cannot clamp and refine, since idx_max (= {}) is either 0 or noi-1".format(idx_max))
                 return
 
-            child_name          = self.name + "_{}".format(len(self.children))
-            child_input_file    = self.input_file
-            child_output_folder = self.output_folder + "/{}".format(len(self.children))
-            self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
+            with state.State(self.input_file) as p_state:
+                from spirit import io
+                io.chain_read(p_state, self.chain_file)
+                self.add_child(p_state, idx_max-1, idx_max+1)
 
-            self.child_indices = [(idx_max-1, idx_max+1)]
-
-            self.children[-1].current_energy_path = self.current_energy_path.split(idx_max-1, idx_max+1)
-            self.children[-1].allow_split = False # Dont allow splitting for clamp and refine
-
-            # Copy the other attributes
-            self.children[-1].target_noi             = 5
-            self.children[-1].convergence            = convergence
-            self.children[-1].max_total_iterations   = max_total_iterations
-            self.children[-1].state_prepare_callback = self.state_prepare_callback
-            self.children[-1].gneb_step_callback     = self.gneb_step_callback
-            self.children[-1].exit_callback          = self.exit_callback
+                # Attributes, that we dont copy
+                self.children[-1].allow_split = False  # Dont allow splitting for clamp and refine
+                self.children[-1].target_noi           = target_noi
+                self.children[-1].convergence          = convergence
+                self.children[-1].max_total_iterations = max_total_iterations
 
             if apply_ci:
                 def before_gneb_cb(gnw, p_state):
                     from spirit import parameters
-                    self.before_gneb_callback(gnw, p_state)
                     gnw.log("Setting image type")
-                    parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=2)
+                        parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=int((target_noi-1)/2))
             else:
                 def before_gneb_cb(gnw, p_state):
-                    self.before_gneb_callback(gnw, p_state)
+                        pass
 
-            self.children[-1].before_gneb_callback   = before_gneb_cb
-            self.children[-1].before_llg_callback    = self.before_llg_callback
-            self.children[-1].n_iterations_check     = self.n_iterations_check
-            self.children[-1].n_checks_save          = self.n_checks_save
-
-            with state.State(self.input_file) as p_state:
-                from spirit import io
-                io.chain_read(p_state, self.chain_file)
-                chain_write_between(p_state, self.children[-1].chain_file, idx_max-1, idx_max+1)
+                self.children[-1].before_gneb_callback = before_gneb_cb
 
             self.run_children()
 
