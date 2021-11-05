@@ -127,12 +127,14 @@ def spin_system_from_p_state(p_state, copy=False):
     return spin_system
 
 class energy_path:
-    reaction_coordinate  = []
-    total_energy         = []
-    energy_contributions = {}
-    interpolated_reaction_coordinate = []
-    interpolated_total_energy = []
-    interpolated_energy_contributions = {}
+
+    def __init__(self):
+        self.reaction_coordinate  = []
+        self.total_energy         = []
+        self.energy_contributions = {}
+        self.interpolated_reaction_coordinate = []
+        self.interpolated_total_energy = []
+        self.interpolated_energy_contributions = {}
 
     def idx_sp(self):
         return np.argmax(self.total_energy)
@@ -155,5 +157,9 @@ def energy_path_from_p_state(p_state):
     result.total_energy                     = chain.get_energy(p_state)
     result.interpolated_reaction_coordinate = chain.get_reaction_coordinate_interpolated(p_state)
     result.interpolated_total_energy        = chain.get_energy_interpolated(p_state)
+
+    if(result.interpolated_reaction_coordinate[-1] == 0): # Quick check if the interpolated quantities have been computed
+        result.interpolated_reaction_coordinate = []
+        result.interpolated_total_energy = []
 
     return result
