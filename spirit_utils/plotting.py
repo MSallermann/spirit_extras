@@ -94,7 +94,7 @@ def energy_path_from_p_state(p_state):
 
     return result
 
-def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwargs_discrete={}, kwargs_interpolated={}):
+def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwargs_discrete={}, kwargs_interpolated={}, plot_interpolated=True):
 
     set_kwarg_if_not_there(kwargs_discrete, "markeredgecolor", "black")
     set_kwarg_if_not_there(kwargs_discrete, "marker", "o")
@@ -108,7 +108,7 @@ def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwa
 
     E0 = energy_path.total_energy[-1]
 
-    if(len(energy_path.interpolated_reaction_coordinate) > 0):
+    if(len(energy_path.interpolated_reaction_coordinate) > 0 and plot_interpolated):
         Rx_int = np.array(energy_path.interpolated_reaction_coordinate)
         if normalize_reaction_coordinate:
             Rx_int = Rx_int / Rx_int[-1]
