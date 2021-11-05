@@ -18,37 +18,31 @@ from datetime import datetime
 class GNEB_Node(NodeMixin):
     """A class that represents a GNEB calculation on a single chain. Can spawn children if cutting of the chain becomes necessary."""
 
-    chain_file : str             = ""
-    initial_chain_file : str     = ""
-    input_file : str             = ""
-    gneb_workflow_log_file : str = ""
-    current_energy_path = object()
-    n_iterations_check  = 5000
-    n_checks_save       = 3
-    total_iterations    = 0
-    intermediate_minima = []
-
-    target_noi  = 10
-    noi = -1
-    convergence = 1e-4
-    max_total_iterations = -1
-
-    output_folder = ""
-    output_tag    = ""
-
-    child_indices = []
-
-    allow_split = True
-    state_prepare_callback = None
-    gneb_step_callback     = None
-    exit_callback          = None
-    before_gneb_callback   = None
-    before_llg_callback    = None
-
-    _converged    = False
-
     def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
         """Constructor."""
+        self.chain_file : str             = ""
+        self.initial_chain_file : str     = ""
+        self.input_file : str             = ""
+        self.gneb_workflow_log_file : str = ""
+        self.current_energy_path = object()
+        self.n_iterations_check  = 5000
+        self.n_checks_save       = 3
+        self.total_iterations    = 0
+        self.target_noi  = 10
+        self.noi         = -1
+        self.convergence = 1e-4
+        self.max_total_iterations = -1
+        self.output_folder = ""
+        self.output_tag    = ""
+        self.allow_split = True
+        self.state_prepare_callback = None
+        self.gneb_step_callback     = None
+        self.exit_callback          = None
+        self.before_gneb_callback   = None
+        self.before_llg_callback    = None
+        self.intermediate_minima = []
+        self.child_indices       = []
+        self._converged          = False
 
         # Create output folder
         if not os.path.exists(output_folder):
