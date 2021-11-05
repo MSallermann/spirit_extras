@@ -104,6 +104,47 @@ class GNEB_Node(NodeMixin):
             child_output_folder = self.output_folder + "/{}".format(i)
             c.change_output_folder(child_output_folder, log_file)
 
+    def collect_chain(self, output_file):
+        from spirit import state, io, chain
+        self.log("Collecting chain in file {}".format(output_file))
+
+        def helper(p_state, node):
+            node.log("    collecting...")
+            # Make sure the number of images matches our current simulation state
+            chain.image_to_clipboard(p_state)
+            noi = io.n_images_in_file(p_state, node.chain_file)
+            chain.set_length(p_state, noi)
+            io.chain_read(p_state, node.chain_file)
+            noi = chain.get_noi(p_state)
+
+            i = 0
+            while i < noi:
+                # First we check if this images is within any of the ranges covered by the children
+                is_child = False
+                for idx_c, (i1, i2) in enumerate(node.child_indices):
+                    if i>=i1 and i<=i2:
+                        is_child = True
+                        idx_child = idx_c
+                        break
+
+                # If the current idx is covered by a child node, we open up another level of recursion, else we append the image
+                if is_child:
+                    helper(p_state, node.children[idx_child])
+                    # After collecting the child we advance the current iteration idx, so that we continue one past the last child index
+                    i = node.child_indices[idx_child][1] + 1
+                    # We also need to read the chain file again to return to our previous state
+                    chain.image_to_clipboard(p_state)
+                    chain.set_length(p_state, noi)
+                    io.chain_read(p_state, node.chain_file)
+                else:
+                    io.image_append(p_state, output_file, idx_image=i)
+                    i += 1
+
+        with state.State(self.input_file) as p_state:
+            helper(p_state, self)
+
+        self.log("Done collecting chain in file")
+
     def to_json(self):
         json_file = self.output_folder + "/node.json"
         self.log("Saving to {}".format(json_file))
