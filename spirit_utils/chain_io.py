@@ -32,6 +32,8 @@ def chain_write_split_at(p_state, filename_list, idx_list, fileformat=None):
 
 
 def chain_append_from_file(p_state, filename):
+    # TODO: chain_read with insert_idx seems to be broken
+    raise NotImplementedError()
     from spirit import io, chain
     noi_file = io.n_images_in_file(p_state, filename)
     noi = chain.get_noi(p_state)
@@ -39,3 +41,15 @@ def chain_append_from_file(p_state, filename):
     chain.set_length(p_state, noi + noi_file)
     io.chain_read(p_state, filename, insert_idx=noi)
     chain.update_data(p_state)
+
+
+def chain_append_to_file_from_file(p_state, filename_out, filename_in):
+    from spirit import io, chain
+    noi_file = io.n_images_in_file(p_state, filename_in)
+    chain.image_to_clipboard(p_state)
+    chain.set_length(p_state, noi_file)
+    io.chain_read(p_state, filename_in)
+
+    # TODO: io.chain_append seems to be broken, so we use image_append...
+    for i in range(noi_file):
+        io.image_append(p_state, filename_out, idx_image=i)
