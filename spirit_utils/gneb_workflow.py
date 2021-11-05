@@ -14,6 +14,7 @@ from .data import energy_path, energy_path_from_p_state
 from .util import set_output_folder
 from .chain_io import chain_write_between, chain_write_split_at
 from datetime import datetime
+import json
 
 class GNEB_Node(NodeMixin):
     """A class that represents a GNEB calculation on a single chain. Can spawn children if cutting of the chain becomes necessary."""
@@ -82,6 +83,77 @@ class GNEB_Node(NodeMixin):
             for c in children:
                 creation_msg += "{} ".format(c.name)
         self.log(creation_msg)
+
+    def to_json(self):
+        json_file = self.output_folder + "/node.json"
+        self.log("Saving to {}".format(json_file))
+
+        node_dict = dict(
+            name                   = str(self.name),
+            chain_file             = str(self.chain_file),
+            initial_chain_file     = str(self.initial_chain_file),
+            input_file             = str(self.input_file),
+            gneb_workflow_log_file = str(self.gneb_workflow_log_file),
+            n_iterations_check     = int(self.n_iterations_check),
+            n_checks_save          = int(self.n_checks_save),
+            total_iterations       = int(self.total_iterations),
+            target_noi             = int(self.target_noi),
+            convergence            = float(self.convergence),
+            max_total_iterations   = int(self.max_total_iterations),
+            output_folder          = str(self.output_folder),
+            output_tag             = str(self.output_tag),
+            child_indices          = [(int(c1), int(c2)) for c1, c2 in self.child_indices],
+            allow_split            = bool(self.allow_split)
+        )
+
+        with open(json_file, "w") as f:
+            f.write(json.dumps(node_dict, indent=4))
+
+        for c in self.children:
+            c.to_json()
+
+    @staticmethod
+    def from_json(json_file, parent=None, children=None):
+
+        with open(json_file, "r") as f:
+            data = json.load(f)
+
+        name                   = data["name"]
+        chain_file             = data["chain_file"]
+        initial_chain_file     = data["initial_chain_file"]
+        input_file             = data["input_file"]
+        gneb_workflow_log_file = data["gneb_workflow_log_file"]
+        n_iterations_check     = data["n_iterations_check"]
+        n_checks_save          = data["n_checks_save"]
+        total_iterations       = data["total_iterations"]
+        target_noi             = data["target_noi"]
+        convergence            = data["convergence"]
+        max_total_iterations   = data["max_total_iterations"]
+        output_folder          = data["output_folder"]
+        output_tag             = data["output_tag"]
+        child_indices          = data["child_indices"]
+        allow_split            = data["allow_split"]
+
+        result                      = GNEB_Node(name, input_file, output_folder, None, gneb_workflow_log_file, parent=parent, children=children)
+        result.n_iterations_check   = n_iterations_check
+        result.n_checks_save        = n_checks_save
+        result.total_iterations     = total_iterations
+        result.target_noi           = target_noi
+        result.convergence          = convergence
+        result.max_total_iterations = max_total_iterations
+        result.chain_file           = chain_file
+        result.initial_chain_file   = initial_chain_file
+        result.output_tag           = output_tag
+        result.allow_split          = allow_split
+        result.child_indices        = child_indices
+
+        result.log("Created from json file {}".format(json_file))
+
+        for i in range(len(child_indices)):
+            new_json_file = result.output_folder + "/{}/node.json".format(i)
+            GNEB_Node.from_json(new_json_file, parent=result)
+
+        return result
 
     def log(self, message):
         """Append a message with date/time information to the log file."""
