@@ -84,6 +84,26 @@ class GNEB_Node(NodeMixin):
                 creation_msg += "{} ".format(c.name)
         self.log(creation_msg)
 
+    def change_output_folder(self, new_output_folder, log_file=None):
+        if os.path.exists(new_output_folder):
+            raise Exception("Cannot change to new_output_folder, that already exists!")
+
+        if self.parent == None:
+            shutil.copytree(self.output_folder, new_output_folder) # Take care of all files we might need
+            log_file = new_output_folder + "/workflow_log.txt"
+
+        self.output_folder          = new_output_folder
+        self.chain_file             = self.output_folder + "/chain.ovf"
+        self.gneb_workflow_log_file = log_file
+        if os.path.exists(self.initial_chain_file):
+            self.initial_chain_file     = self.output_folder + "/root_initial_chain.ovf"
+
+        self.log("Changed output folder to {}".format(new_output_folder))
+
+        for i,c in enumerate(self.children):
+            child_output_folder = self.output_folder + "/{}".format(i)
+            c.change_output_folder(child_output_folder, log_file)
+
     def to_json(self):
         json_file = self.output_folder + "/node.json"
         self.log("Saving to {}".format(json_file))
