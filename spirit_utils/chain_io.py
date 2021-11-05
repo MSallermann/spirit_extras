@@ -29,3 +29,13 @@ def chain_write_split_at(p_state, filename_list, idx_list, fileformat=None):
 
     for i,f in enumerate(filename_list):
         chain_write_between(p_state, f, idx_start=idx_list[i], idx_stop=idx_list[i+1], fileformat=fileformat)
+
+
+def chain_append_from_file(p_state, filename):
+    from spirit import io, chain
+    noi_file = io.n_images_in_file(p_state, filename)
+    noi = chain.get_noi(p_state)
+    chain.image_to_clipboard(p_state)
+    chain.set_length(p_state, noi + noi_file)
+    io.chain_read(p_state, filename, insert_idx=noi)
+    chain.update_data(p_state)
