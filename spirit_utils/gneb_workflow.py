@@ -482,6 +482,7 @@ class GNEB_Node(NodeMixin):
                     self.before_gneb_callback(self, p_state)
 
                 try:
+                    self.log("Starting GNEB iterations")
                     n_checks = 0 
                     while(self.check_run_condition()):
 
