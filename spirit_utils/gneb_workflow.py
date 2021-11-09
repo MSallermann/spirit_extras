@@ -43,6 +43,7 @@ class GNEB_Node(NodeMixin):
         self.before_llg_callback    = None
         self.intermediate_minima = []
         self.child_indices       = []
+        self._ci                 = False
         self._converged          = False
 
         # Create output folder
@@ -585,19 +586,21 @@ class GNEB_Node(NodeMixin):
                 self.add_child(p_state, idx_max-1, idx_max+1)
 
                 # Attributes, that we dont copy
-                self.children[-1].allow_split = False  # Dont allow splitting for clamp and refine
+                self.children[-1].allow_split          = False  # Dont allow splitting for clamp and refine
                 self.children[-1].target_noi           = target_noi
                 self.children[-1].convergence          = convergence
                 self.children[-1].max_total_iterations = max_total_iterations
 
-            if apply_ci:
+                if apply_ci and not self._ci:
                 def before_gneb_cb(gnw, p_state):
                     from spirit import parameters
+                        self.before_gneb_callback(gnw, p_state)
                     gnw.log("Setting image type")
                         parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=int((target_noi-1)/2))
+                    self.children[-1]._ci = True
             else:
                 def before_gneb_cb(gnw, p_state):
-                        pass
+                        self.before_gneb_callback(gnw, p_state)
 
                 self.children[-1].before_gneb_callback = before_gneb_cb
 
