@@ -186,6 +186,7 @@ class GNEB_Node(NodeMixin):
                     i += 1
 
         with state.State(self.input_file) as p_state:
+            self._prepare_state(p_state)
             helper(p_state, self)
 
         self.log("Done collecting chain in file")
@@ -272,27 +273,13 @@ class GNEB_Node(NodeMixin):
     def update_energy_path(self, p_state=None):
         """Updates the current energy path. If p_state is given we just use that, otherwise we have to construct it first"""
         if p_state:
-        self.current_energy_path = energy_path_from_p_state(p_state)
+            self.current_energy_path = energy_path_from_p_state(p_state)
         else:
             from spirit import state, io
             with state.State(self.input_file) as p_state:
-                # Set the output folder for the files created by spirit
-                set_output_folder(p_state, self.output_folder, self.output_tag)
-
-                # The state prepare callback can be used to change the state before execution of any other commands
-                # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
-                if self.state_prepare_callback:
-                    self.state_prepare_callback(self, p_state)
-
-                # Before we run we must make sure that the chain.ovf file exists now
-                if not os.path.exists(self.chain_file):
-                    raise Exception("Chain file does not exist!")
-
-                # Read the file, increase up to at leas target_noi and update the energy_path (for plotting etc.)
-                io.chain_read(p_state, self.chain_file)
+                self._prepare_state(p_state)
                 self.increase_noi(p_state)
                 self.update_energy_path(p_state)
-
 
     def check_for_minima(self, tol=0.05):
         """
@@ -347,7 +334,6 @@ class GNEB_Node(NodeMixin):
 
         return self.children[-1] # Return a reference to the child that has just been added
 
-
     def spawn_children(self, p_state):
         """Creates child nodes"""
 
@@ -385,7 +371,7 @@ class GNEB_Node(NodeMixin):
         idx_children_run_order = list(range(len(self.children)))
 
         try:
-        idx_children_run_order.sort(key = lambda i : -self.children[i].current_energy_path.barrier())
+            idx_children_run_order.sort(key = lambda i : -self.children[i].current_energy_path.barrier())
         except Exception as e:
             self.log("Could not sort children run order by energy barrier. Executing in order.")
             idx_children_run_order = list(range(len(self.children)))
@@ -442,6 +428,28 @@ class GNEB_Node(NodeMixin):
 
         self.log("Number of images = {}".format(self.noi))
 
+    def _prepare_state(self, p_state):
+        """Prepares the state and reads in the chain."""
+        from spirit import parameters, io
+
+        # Set the output folder for the files created by spirit
+        set_output_folder(p_state, self.output_folder, self.output_tag)
+
+        # Set the gneb convergence parameter
+        parameters.gneb.set_convergence(p_state, self.convergence)
+
+        # The state prepare callback can be used to change the state before execution of any other commands
+        # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
+        if self.state_prepare_callback:
+            self.state_prepare_callback(self, p_state)
+
+        # Before we run we must make sure that the chain.ovf file exists now
+        if not os.path.exists(self.chain_file):
+            raise Exception("Chain file does not exist!")
+
+        # Read the file, increase up to at leas target_noi and update the energy_path (for plotting etc.)
+        io.chain_read(p_state, self.chain_file)
+
     def check_run_condition(self):
         """Returns True if the run loop should be continued."""
         return (not self._converged) and (len(self.intermediate_minima) <= 0) and (self.total_iterations < self.max_total_iterations or self.max_total_iterations < 0)
@@ -456,28 +464,15 @@ class GNEB_Node(NodeMixin):
         try:
             self.log("Running")
 
-            from spirit import state, simulation, io, parameters
+            from spirit import state, simulation, io
 
             with state.State(self.input_file) as p_state:
-                # Set the output folder for the files created by spirit
-                set_output_folder(p_state, self.output_folder, self.output_tag)
-                parameters.gneb.set_convergence(p_state, self.convergence)
 
-                # The state prepare callback can be used to change the state before execution of any other commands
-                # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
-                if self.state_prepare_callback:
-                    self.state_prepare_callback(self, p_state)
-
-                # Before we run we must make sure that the chain.ovf file exists now
-                if not os.path.exists(self.chain_file):
-                    raise Exception("Chain file does not exist!")
-
-                # Read the file, increase up to at leas target_noi and update the energy_path (for plotting etc.)
-                io.chain_read(p_state, self.chain_file)
+                self._prepare_state(p_state)
                 self.increase_noi(p_state)
                 self.update_energy_path(p_state)
 
-                # Another callback at whicht the chain actually exists now, theoretically one could set image types here
+                # Another callback at which the chain actually exists now, theoretically one could set image types here
                 if self.before_gneb_callback:
                     self.before_gneb_callback(self, p_state)
 
@@ -522,9 +517,9 @@ class GNEB_Node(NodeMixin):
                     self.before_llg_callback(self, p_state)
 
                 if len(self.intermediate_minima) > 0:
-                self.log("Relaxing intermediate minima")
-                for idx_minimum in self.intermediate_minima:
-                    simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
+                    self.log("Relaxing intermediate minima")
+                    for idx_minimum in self.intermediate_minima:
+                        simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
 
                 self.update_energy_path(p_state)
 
@@ -583,7 +578,7 @@ class GNEB_Node(NodeMixin):
 
             with state.State(self.input_file) as p_state:
                 from spirit import io
-                io.chain_read(p_state, self.chain_file)
+                self._prepare_state(p_state)
                 self.add_child(p_state, idx_max-1, idx_max+1)
 
                 # Attributes, that we dont copy
@@ -593,14 +588,14 @@ class GNEB_Node(NodeMixin):
                 self.children[-1].max_total_iterations = max_total_iterations
 
                 if apply_ci and not self._ci:
-                def before_gneb_cb(gnw, p_state):
-                    from spirit import parameters
+                    def before_gneb_cb(gnw, p_state):
+                        from spirit import parameters
                         self.before_gneb_callback(gnw, p_state)
-                    gnw.log("Setting image type")
+                        gnw.log("Setting image type")
                         parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=int((target_noi-1)/2))
                     self.children[-1]._ci = True
-            else:
-                def before_gneb_cb(gnw, p_state):
+                else:
+                    def before_gneb_cb(gnw, p_state):
                         self.before_gneb_callback(gnw, p_state)
 
                 self.children[-1].before_gneb_callback = before_gneb_cb
