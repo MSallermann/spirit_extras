@@ -1,4 +1,5 @@
 def chain_write_between(p_state, filename, idx_start, idx_stop, fileformat=None):
+    """Writes the chain between idx_start and idx_stop to a file. Includes the endpoints!"""
     from spirit import io, chain
 
     if not fileformat:
@@ -9,9 +10,9 @@ def chain_write_between(p_state, filename, idx_start, idx_stop, fileformat=None)
     if(idx_start > idx_stop or idx_start < 0 or idx_stop>= noi):
         raise Exception("Error in idx_start and/or idx_stop")
 
-    io.image_write(p_state, filename, idx_image = idx_start, fileformat=fileformat)
+    io.image_write(p_state, filename, idx_image = idx_start, fileformat = fileformat)
     for i in range(idx_start+1, idx_stop+1):
-        io.image_append(p_state, filename, idx_image = i, fileformat=fileformat)
+        io.image_append(p_state, filename, idx_image = i, fileformat = fileformat)
 
 
 def chain_write_split_at(p_state, filename_list, idx_list, fileformat=None):
