@@ -36,13 +36,7 @@ def find_spirit(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, 
     def str2bool(v):
         return v.lower() in ("yes", "true", "on", "1")
 
-    def insert_path(path_str):
-        if(len(path_str) > 0):
-            sys.path.insert(0, path_str)
-
-    candidate_list     = []
-    candidate_info = []
-    candidate_list_no_lib = []
+    candidate_list = []
 
     n_rejected_by_choose = 0
     for root, dirs, files in os.walk(os.path.expanduser(base_dir)):
@@ -57,7 +51,7 @@ def find_spirit(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, 
                 if(os.path.exists(os.path.join(root, spiritlib._get_spirit_lib_name()))):
                     candidate.has_libspirit = True
                     try:
-                        version = SourceFileLoader("module.name",  os.path.join(root, "version.py")).load_module() # Read out the version
+                        version = SourceFileLoader("module.name", os.path.join(root, "version.py")).load_module() # Read out the version
                         candidate.version = version.version
                         candidate.version_major = version.version_major
                         candidate.version_minor = version.version_minor
