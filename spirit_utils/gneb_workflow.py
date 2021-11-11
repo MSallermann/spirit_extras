@@ -1,5 +1,4 @@
 from anytree import Node, NodeMixin, RenderTree 
-from anytree.exporter import DotExporter
 import os
 
 import shutil
@@ -12,7 +11,7 @@ from numpy import inf
 
 from .data import energy_path, energy_path_from_p_state
 from .util import set_output_folder
-from .chain_io import chain_write_between, chain_write_split_at
+from .chain_io import chain_write_between
 from datetime import datetime
 import json
 
@@ -32,7 +31,8 @@ class GNEB_Node(NodeMixin):
         self.target_noi  = 10
         self.noi         = -1
         self.convergence = 1e-4
-        self.max_total_iterations = -1
+        self.path_shortening_constant = -1
+        self.max_total_iterations     = -1
         self.output_folder = ""
         self.output_tag    = ""
         self.allow_split = True
@@ -152,6 +152,9 @@ class GNEB_Node(NodeMixin):
     def collect_chain(self, output_file):
         from spirit import state, io, chain
         self.log("Collecting chain in file {}".format(output_file))
+
+        if os.path.exists(output_file):
+            os.remove(output_file)
 
         def helper(p_state, node):
             node.log("    collecting...")
@@ -281,20 +284,15 @@ class GNEB_Node(NodeMixin):
                 self.increase_noi(p_state)
                 self.update_energy_path(p_state)
 
-    def check_for_minima(self, tol=0.05):
+    def check_for_minima(self):
         """
-           Checks the chain for intermediate minima. Tol controls how sensitive this check is, lower tol means more sensitive. 
-           E.g a tol of 0.1 means that the minimum energy difference between the image in question and any 
-           of the two neighbouring images has to be larger than 10% of the images energy to count as an intermediate minimumg.
-           Default tol = 0.05
+           Checks the chain for intermediate minima.
         """
         self.intermediate_minima = []
         e = self.current_energy_path.total_energy
         for i in range(1, len(e) - 1): # Leave out the first and the last energy
-            if(e[i-1] > e[i] and e[i+1] > e[i] ):
-                
-                if(abs(min(e[i-1] - e[i], e[i+1] - e[i])) > abs(tol * e[i]) ):
-                    self.intermediate_minima.append(i)
+            if(e[i-1] > e[i] and e[i+1] > e[i]):
+                self.intermediate_minima.append(i)
 
         if(len(self.intermediate_minima) > 0):
             self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
@@ -306,6 +304,7 @@ class GNEB_Node(NodeMixin):
         io.chain_write(p_state, self.chain_file)
 
     def add_child(self, p_state, i1, i2):
+        self.log("Adding child with indices {} and {}".format(i1, i2))
         # Attributes that change due to tree structure
         child_name          = self.name + "_{}".format(len(self.children))
         child_input_file    = self.input_file
@@ -317,6 +316,7 @@ class GNEB_Node(NodeMixin):
         # Copy the other attributes
         self.children[-1].target_noi             = self.target_noi
         self.children[-1].convergence            = self.convergence
+        self.children[-1].path_shortening_constant = self.path_shortening_constant
         self.children[-1].max_total_iterations   = self.max_total_iterations
         self.children[-1].state_prepare_callback = self.state_prepare_callback
         self.children[-1].gneb_step_callback     = self.gneb_step_callback
@@ -447,6 +447,9 @@ class GNEB_Node(NodeMixin):
         if not os.path.exists(self.chain_file):
             raise Exception("Chain file does not exist!")
 
+        if self.path_shortening_constant > 0:
+            parameters.gneb.set_path_shortening_constant(p_state, self.path_shortening_constant)
+
         # Read the file, increase up to at leas target_noi and update the energy_path (for plotting etc.)
         io.chain_read(p_state, self.chain_file)
 
@@ -538,7 +541,7 @@ class GNEB_Node(NodeMixin):
             self.log(traceback.format_exc())
             raise e
 
-    def clamp_and_refine(self, convergence=None, max_total_iterations=None, mode="max", apply_ci=True, target_noi=5):
+    def clamp_and_refine(self, convergence=None, max_total_iterations=None, idx_max_list=None, apply_ci=True, target_noi=5):
         """One step of clamp and refine algorithm"""
 
         if target_noi % 2 == 0:
@@ -554,51 +557,68 @@ class GNEB_Node(NodeMixin):
             from spirit import state
             if(len(self.children) != 0): # If not a leaf node call recursively on children
                 for c in self.children:
-                    c.clamp_and_refine(convergence, max_total_iterations, mode, apply_ci, target_noi)
+                    c.clamp_and_refine(convergence, max_total_iterations, idx_max_list, apply_ci, target_noi)
                 return
 
             self.update_energy_path()
 
-            try:
-                idx_max = int(mode)
-            except Exception as e:
-                if mode.lower() == "max":
-                    idx_max = self.current_energy_path.idx_sp()
-                elif mode.lower() == "cliff":
-                    grad = np.abs( np.array(self.current_energy_path.total_energy)[1:] - np.array(self.current_energy_path.total_energy)[:-1] )
-                    idx_max = np.argmax(grad)
-                else:
-                    raise Exception("Unknown mode")
+            # To get a list of the "interesting" images we compute the second derivative of the energy wrt to Rx
+            # We initialize these lists with a dummy element so the idx counting is not offset by one
+            second_deriv    = [0] # second derivative
+            first_deriv_fw  = [0] # first derivative forward
+            first_deriv_bw  = [0] # first derivative backward
 
-            self.log("Clamp and refine! mode = {}, idx = {}".format(mode, idx_max))
+            E  = self.current_energy_path.total_energy
+            Rx = self.current_energy_path.reaction_coordinate
 
-            if(idx_max == 0 or idx_max == self.noi - 1):
-                self.log("Cannot clamp and refine, since idx_max (= {}) is either 0 or noi-1".format(idx_max))
-                return
+            for idx in range(1, self.current_energy_path.noi()-1): # idx=0 and idx=noi-1 excluded!
+                grad_forward = (E[idx+1] - E[idx]) / (Rx[idx+1] - Rx[idx])
+                grad_backward = (E[idx] - E[idx-1]) / (Rx[idx] - Rx[idx-1])
+                second = 2 * (grad_forward - grad_backward) / ( Rx[idx+1] - Rx[idx-1] )
+                first_deriv_fw.append(grad_forward)
+                first_deriv_bw.append(grad_backward)
+                second_deriv.append(second)
 
-            with state.State(self.input_file) as p_state:
-                from spirit import io
-                self._prepare_state(p_state)
-                self.add_child(p_state, idx_max-1, idx_max+1)
+            # If not specified, build the idx_max list
+            if not idx_max_list:
+                idx_max_list = []
+                idx = 1
+                while idx<self.current_energy_path.noi()-1:
+                    if first_deriv_fw[idx]<0 and first_deriv_bw[idx] > 0.01 * first_deriv_fw[idx]:
+                        idx_max_list.append(idx)
+                        idx += 1 # If we add something to idx_max list we increment the idx so that we do not also add the point right after that
+                    idx += 1
 
-                # Attributes, that we dont copy
-                self.children[-1].allow_split          = False  # Dont allow splitting for clamp and refine
-                self.children[-1].target_noi           = target_noi
-                self.children[-1].convergence          = convergence
-                self.children[-1].max_total_iterations = max_total_iterations
+            self.log("Clamp and refine! idx_list = {}".format(idx_max_list))
 
-                if apply_ci and not self._ci:
-                    def before_gneb_cb(gnw, p_state):
-                        from spirit import parameters
-                        self.before_gneb_callback(gnw, p_state)
-                        gnw.log("Setting image type")
-                        parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=int((target_noi-1)/2))
-                    self.children[-1]._ci = True
-                else:
-                    def before_gneb_cb(gnw, p_state):
-                        self.before_gneb_callback(gnw, p_state)
+            for idx_max in idx_max_list:
+                if(idx_max == 0 or idx_max == self.noi - 1):
+                    self.log("Cannot clamp and refine, since idx_max (= {}) is either 0 or noi-1".format(idx_max))
+                    return
 
-                self.children[-1].before_gneb_callback = before_gneb_cb
+                with state.State(self.input_file) as p_state:
+                    self._prepare_state(p_state)
+                    self.add_child(p_state, idx_max-1, idx_max+1)
+
+                    # Attributes, that we dont copy
+                    self.children[-1].allow_split          = False  # Dont allow splitting for clamp and refine
+                    self.children[-1].path_shortening_constant = -1 # No path shortening for clamp and refine
+                    self.children[-1].target_noi           = target_noi
+                    self.children[-1].convergence          = convergence
+                    self.children[-1].max_total_iterations = max_total_iterations
+
+                    if apply_ci and not self._ci:
+                        def before_gneb_cb(gnw, p_state):
+                            from spirit import parameters
+                            self.before_gneb_callback(gnw, p_state)
+                            gnw.log("Setting image type")
+                            parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=int((target_noi-1)/2))
+                        self.children[-1]._ci = True
+                    else:
+                        def before_gneb_cb(gnw, p_state):
+                            self.before_gneb_callback(gnw, p_state)
+
+                    self.children[-1].before_gneb_callback = before_gneb_cb
 
             self.run_children()
 

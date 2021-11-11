@@ -139,6 +139,9 @@ class energy_path:
     def idx_sp(self):
         return np.argmax(self.total_energy)
 
+    def noi(self):
+        return len(self.reaction_coordinate)
+
     def split(self, idx_0, idx_1):
         #TODO: interpolated quantities
         split_path = energy_path()
