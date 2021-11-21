@@ -45,6 +45,7 @@ class GNEB_Node(NodeMixin):
         self.child_indices       = []
         self._ci                 = False
         self._converged          = False
+        self.history = []
 
         # Create output folder
         if not os.path.exists(output_folder):
@@ -120,6 +121,14 @@ class GNEB_Node(NodeMixin):
             mark_climbing_image(p_state, gnw, plt.gca())
             plt.savefig(gnw.output_folder + "/path_{}.png".format(gnw.total_iterations))
             plt.close()
+
+            plt.plot( np.asarray(gnw.history)[:,0], np.asarray(gnw.history)[:,1] )
+            plt.xlabel("Total iterations")
+            plt.ylabel("Max. torque [meV]")
+            plt.yscale("log")
+            plt.savefig(gnw.output_folder + "/convergence.png")
+            plt.close()
+            
         self.gneb_step_callback = step_cb
 
         def exit_cb(gnw, p_state):
@@ -335,21 +344,24 @@ class GNEB_Node(NodeMixin):
         return self.children[-1] # Return a reference to the child that has just been added
 
     def spawn_children(self, p_state):
-        """Creates child nodes"""
+        """If intermediate minima are present, relaxes them and creates child nodes"""
+
+        from spirit import chain, simulation
 
         if not self.allow_split:
-            return
-
-        if self._converged:
-            self.log("Converged")
             return
 
         if len(self.intermediate_minima) == 0:
             return
 
+        if self._converged:
+            return
+
         self.log("Spawning children - splitting chain")
 
-        from spirit import chain
+        self.log("Relaxing intermediate minima")
+        for idx_minimum in self.intermediate_minima:
+            simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
 
         # Instantiate the GNEB nodes
         noi = chain.get_noi(p_state)
@@ -455,7 +467,14 @@ class GNEB_Node(NodeMixin):
 
     def check_run_condition(self):
         """Returns True if the run loop should be continued."""
-        return (not self._converged) and (len(self.intermediate_minima) <= 0) and (self.total_iterations < self.max_total_iterations or self.max_total_iterations < 0)
+        condition_minima     = len(self.intermediate_minima) <= 0
+        condition_iterations = self.total_iterations < self.max_total_iterations or self.max_total_iterations < 0
+        condition_convergence = not self._converged
+
+        if self.allow_split: # Only care about minima if splitting is allowed
+            return condition_minima and condition_iterations and condition_convergence
+        else:
+            return condition_iterations and condition_convergence
 
     def run(self):
         """Run GNEB with checks after a certain number of iterations"""
@@ -498,6 +517,8 @@ class GNEB_Node(NodeMixin):
 
                         self._converged = info.max_torque < self.convergence
 
+                        self.history.append([self.total_iterations, info.max_torque])
+
                         # Step callback to e.g plot chains
                         if(self.gneb_step_callback):
                             self.gneb_step_callback(self, p_state)
@@ -519,19 +540,18 @@ class GNEB_Node(NodeMixin):
                 if self.before_llg_callback:
                     self.before_llg_callback(self, p_state)
 
-                if len(self.intermediate_minima) > 0:
-                    self.log("Relaxing intermediate minima")
-                    for idx_minimum in self.intermediate_minima:
-                        simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
-
                 self.update_energy_path(p_state)
+
+                if self._converged:
+                    self.log("Converged!")
+                else:
+                    self.spawn_children(p_state)
+
+                self.save_chain(p_state)
 
                 if(self.exit_callback):
                     self.exit_callback(self, p_state)
 
-                self.save_chain(p_state)
-
-                self.spawn_children(p_state)
                 # p_state gets deleted here, it does not have to persist to run the child nodes
             self.run_children()
             self.log("Finished!")
