@@ -58,7 +58,7 @@ class GNEB_Node(NodeMixin):
         # If an initial chain is specified we copy it to the output folder
         if(initial_chain_file):
             if not os.path.exists(initial_chain_file):
-                raise Exception("Initial chain file does not exist!")
+                raise Exception("Initial chain file ({}) does not exist!".format(initial_chain_file))
             self.initial_chain_file = output_folder + "/root_initial_chain.ovf"
             shutil.copyfile(initial_chain_file, self.initial_chain_file)
             shutil.copyfile(initial_chain_file, self.chain_file)
