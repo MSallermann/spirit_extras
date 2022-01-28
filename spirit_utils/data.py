@@ -1,16 +1,18 @@
 import numpy as np
 
 class Spin_System:
-    positions       = []
-    spins           = []
-    n_cells         = [0,0,0]
-    n_cell_atoms    = 0
-    basis           = [[0,0,0]]
-    bravais_vectors = [[0,0,0],[0,0,0],[0,0,0]]
-    unordered = False
+
+    def __init__(self):
+        self.positions       = []
+        self.spins           = []
+        self.n_cells         = [0,0,0]
+        self.n_cell_atoms    = 0
+        self.basis           = [[0,0,0]]
+        self.bravais_vectors = [[0,0,0], [0,0,0], [0,0,0]]
+        self.unordered       = False
 
     def __getitem__(self, key):
-        sliced_spin_system = Spin_System()
+        sliced_spin_system           = Spin_System()
         sliced_spin_system.positions = self.positions[key]
         sliced_spin_system.spins     = self.spins[key]
         sliced_spin_system.unordered = True # For a general slice we do not necessarily retain the lattice structure
@@ -81,7 +83,7 @@ class Spin_System:
             return temp
 
     def nos(self):
-        return self.n_cells[0] * self.n_cells[1] * self.n_cells[2] * self.n_cell_atoms
+        return len(self.spins)
 
     def center(self):
         return np.mean(self.flattened().positions, axis=0)

@@ -21,7 +21,7 @@ class spirit_info:
         sys.path.insert(idx, self.path)
 
 
-def find_spirit(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, stop_on_first_viable=True):
+def find_spirit(base_dir="~", quiet=True, choose = lambda c : c.has_libspirit, stop_on_first_viable=True):
     import os
     from importlib.machinery import SourceFileLoader
 
@@ -79,7 +79,7 @@ def find_spirit(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, 
             break
 
     if(len(candidate_list) > 1):
-        pr("Found {} viable candidate".format(len(candidate_list)))
+        pr("Found {} viable candidates".format(len(candidate_list)))
         for i,c in enumerate(candidate_list):
             pr("---")
             pr(c)
@@ -92,7 +92,7 @@ class Candidates_Exception(Exception):
     pass
 
 
-def find_and_insert(base_dir="~", quiet=False, choose = lambda c : c.has_libspirit, stop_on_first_viable=True):
+def find_and_insert(base_dir="~", quiet=False, choose=lambda c : c.has_libspirit, stop_on_first_viable=True):
     """ 
     Searches the directory tree starting from 'base_dir' and inserts the path to the spirit library into the python path.
     Raises Candidates_Exception if no viable candidates are found or if more than one viable candidate is found.
