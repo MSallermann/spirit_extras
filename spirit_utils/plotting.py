@@ -97,3 +97,21 @@ def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwa
 
     ax.set_xlabel( "reaction coordinate [arb. units]" )
     ax.set_ylabel( r"$\Delta E$ [meV]" )
+
+def get_rgba_colors(spins, opacity=1.0, cardinal_a=np.array([1,0,0]), cardinal_b=np.array([0,1,0]), cardinal_c=np.array([0,0,1])):
+    """Returns a colormap in the matplotlib format (an Nx4 array)"""
+    import colorsys
+
+    rgba = []
+
+    for spin in spins:
+        phi_offset = 0
+        projection_x = cardinal_a.dot(spin)
+        projection_y = cardinal_b.dot(spin)
+        projection_z = cardinal_c.dot(spin)
+        hue          = (np.arctan2( projection_x, projection_y ) + np.pi) / (2*np.pi)
+        saturation   = (cardinal_c.dot(spin) + 1.0) / 2.0
+        value        = np.sqrt( 1 - saturation**2)
+        rgba.append( [*colorsys.hsv_to_rgb(hue, saturation, value), opacity] )
+
+    return rgba
