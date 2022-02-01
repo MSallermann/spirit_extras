@@ -39,9 +39,28 @@ def save_to_png(image_file_name, mesh_list):
     plotter = pv.Plotter(off_screen=True, shape=(1,1))
 
     for m in mesh_list:
-        plotter.add_mesh(m, sscalars = "spins_rgba", rgb = True, specular=0.7, ambient=0.4, specular_power=5, smooth_shading=True, show_scalar_bar=False, show_edges=False, metallic=True )
+        plotter.add_mesh(m, scalars = "spins_rgba", rgb = True, specular=0.7, ambient=0.4, specular_power=5, smooth_shading=True, show_scalar_bar=False, show_edges=False, metallic=True )
 
     plotter.set_background("white")
     plotter.add_axes(color="black", line_width=6)
 
+    plotter.show(screenshot=image_file_name + ".png")
+
+
+def plot_color_sphere(image_file_name, spin_to_rgba_func):
+    import pyvista as pv
+
+    sphere = pv.Sphere(radius=1.0, start_theta=180, end_theta = 90, phi_resolution=60, theta_resolution=60)
+
+    sphere["spins_rgba"] = spin_to_rgba_func(sphere.points)
+
+    pv.start_xvfb()
+    plotter = pv.Plotter( off_screen=True, shape=(1,1), lighting=None)
+    light = pv.Light(light_type='headlight')
+    # these don't do anything for a headlight:
+    light.position = (1, 2, 3)
+    light.focal_point = (4, 5, 6)
+    plotter.add_light(light)
+    plotter.add_mesh(sphere, scalars="spins_rgba", specular=0.7, ambient=0.4, specular_power=5, rgb=True, smooth_shading=True)
+    plotter.set_background("white")
     plotter.show(screenshot=image_file_name + ".png")

@@ -100,7 +100,36 @@ def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwa
 
 def get_rgba_colors(spins, opacity=1.0, cardinal_a=np.array([1,0,0]), cardinal_b=np.array([0,1,0]), cardinal_c=np.array([0,0,1])):
     """Returns a colormap in the matplotlib format (an Nx4 array)"""
-    import colorsys
+    import math
+
+    # Annoying OpenGl functions
+
+    def atan2(y, x):
+        if x==0.0:
+            return np.sign(y) * np.pi / 2.0
+        else:
+            return np.arctan2(y, x)
+
+    def fract(x):
+        return x - math.floor(x)
+
+    def mix(x,y,a):
+        return x * (1.0-a) + y * a
+
+    def clamp(x, minVal, maxVal):
+        return min(max(x, minVal), maxVal)
+
+    def hsv2rgb(c):
+        K = [1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0]
+
+        px = abs( fract(c[0] + K[0]) * 6.0 - K[3] )
+        py = abs( fract(c[0] + K[1]) * 6.0 - K[3] )
+        pz = abs( fract(c[0] + K[2]) * 6.0 - K[3] )
+        resx = c[2] * mix(K[0], clamp(px - K[0], 0.0, 1.0), c[1])
+        resy = c[2] * mix(K[0], clamp(py - K[0], 0.0, 1.0), c[1])
+        resz = c[2] * mix(K[0], clamp(pz - K[0], 0.0, 1.0), c[1])
+
+        return [resx, resy, resz]
 
     rgba = []
 
@@ -109,9 +138,17 @@ def get_rgba_colors(spins, opacity=1.0, cardinal_a=np.array([1,0,0]), cardinal_b
         projection_x = cardinal_a.dot(spin)
         projection_y = cardinal_b.dot(spin)
         projection_z = cardinal_c.dot(spin)
-        hue          = (np.arctan2( projection_x, projection_y ) + np.pi) / (2*np.pi)
-        saturation   = (cardinal_c.dot(spin) + 1.0) / 2.0
-        value        = np.sqrt( 1 - saturation**2)
-        rgba.append( [*colorsys.hsv_to_rgb(hue, saturation, value), opacity] )
+        hue          = atan2( projection_x, projection_y ) / (2*np.pi)
+
+        saturation   = projection_z
+
+        if saturation > 0.0:
+            saturation = 1.0 - saturation
+            value = 1.0
+        else:
+            value = 1.0 + saturation
+            saturation = 1.0
+
+        rgba.append( [*hsv2rgb( [hue, saturation, value] ), opacity] )
 
     return rgba
