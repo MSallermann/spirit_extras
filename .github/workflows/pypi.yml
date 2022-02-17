@@ -19,7 +19,7 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install numpy setuptools build twine
 
-    - name: Buil
+    - name: Build
       run: |
         python -m build
 
@@ -28,11 +28,11 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       if: github.ref != 'refs/heads/master'
-      run: twine upload --skip-existing --repository testpypi dist/*
+      run: twine upload --repository testpypi dist/*
 
     - name: Deploy to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       if: github.ref == 'refs/heads/master'
-      run: twine upload --skip-existing dist/*
+      run: twine upload dist/*
