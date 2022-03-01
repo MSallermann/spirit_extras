@@ -90,7 +90,7 @@ class GNEB_Node(NodeMixin):
         """Sets up callbacks such that the path is plotted."""
         from spirit import simulation, chain
         from spirit.parameters import gneb
-        from spirit_python_utilities.spirit_utils import plotting, data
+        from spirit_extras import plotting, data
         import matplotlib.pyplot as plt
 
         def mark_climbing_image(p_state, gnw, ax):
@@ -478,7 +478,6 @@ class GNEB_Node(NodeMixin):
 
     def run(self):
         """Run GNEB with checks after a certain number of iterations"""
-
         if(len(self.children) != 0): # If not a leaf node call recursively on children
             self.run_children()
             return
@@ -487,7 +486,7 @@ class GNEB_Node(NodeMixin):
             self.log("Running")
 
             from spirit import state, simulation, io
-
+            self._converged = False
             with state.State(self.input_file) as p_state:
 
                 self._prepare_state(p_state)
