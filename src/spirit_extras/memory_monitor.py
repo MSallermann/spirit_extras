@@ -14,7 +14,7 @@ class MemoryMonitor:
         self.time_list      = []
         self.dt             = dt
         self.time           = datetime.now()
-        self.max_usage      = 0 
+        self.max_usage      = 0
         self.t0             = 0
         self.mem0           = 0
 
@@ -49,7 +49,7 @@ class MemoryMonitor:
         return self.max_usage
 
     def start(self):
-        self.monitor_thread = threading.Thread(target=self._measure_usage, args=())
+        self.monitor_thread = threading.Thread(target=self._measure_usage, args=(), daemon=True)
         self.monitor_thread.start()
 
     def stop(self):
