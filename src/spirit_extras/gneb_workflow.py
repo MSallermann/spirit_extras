@@ -225,6 +225,7 @@ class GNEB_Node(NodeMixin):
             output_tag             = str(self.output_tag),
             child_indices          = [(int(c1), int(c2)) for c1, c2 in self.child_indices],
             allow_split            = bool(self.allow_split),
+            path_shortening_constant = float(self.path_shortening_constant),
             moving_endpoints       = bool(self.moving_endpoints),
             delta_Rx_left          = float(self.delta_Rx_left),
             delta_Rx_right         = float(self.delta_Rx_right),
@@ -243,42 +244,32 @@ class GNEB_Node(NodeMixin):
         with open(json_file, "r") as f:
             data = json.load(f)
 
-        name                   = data["name"]
-        chain_file             = data["chain_file"]
-        initial_chain_file     = data["initial_chain_file"]
-        input_file             = data["input_file"]
-        gneb_workflow_log_file = data["gneb_workflow_log_file"]
-        n_iterations_check     = data["n_iterations_check"]
-        n_checks_save          = data["n_checks_save"]
-        total_iterations       = data["total_iterations"]
-        target_noi             = data["target_noi"]
-        convergence            = data["convergence"]
-        max_total_iterations   = data["max_total_iterations"]
-        output_folder          = data["output_folder"]
-        output_tag             = data["output_tag"]
-        child_indices          = data["child_indices"]
-        allow_split            = data["allow_split"]
+        name                            = data["name"]
+        input_file                      = data["input_file"]
+        gneb_workflow_log_file          = data["gneb_workflow_log_file"]
+        output_folder                   = data["output_folder"]
 
-        result                      = GNEB_Node(name, input_file, output_folder, None, gneb_workflow_log_file, parent=parent, children=children)
-        result.n_iterations_check   = n_iterations_check
-        result.n_checks_save        = n_checks_save
-        result.total_iterations     = total_iterations
-        result.target_noi           = target_noi
-        result.convergence          = convergence
-        result.max_total_iterations = max_total_iterations
-        result.chain_file           = chain_file
-        result.initial_chain_file   = initial_chain_file
-        result.output_tag           = output_tag
-        result.allow_split          = allow_split
-        result.child_indices        = child_indices
-        result.moving_endpoints     = data["moving_endpoints"]
-        result.image_types          = data["image_types"]
-        result.delta_Rx_left        = data["delta_Rx_left"]
-        result.delta_Rx_right       = data["delta_Rx_right"]
+        result                          = GNEB_Node(name, input_file, output_folder, None, gneb_workflow_log_file, parent=parent, children=children)
+        result.n_iterations_check       = data.get("n_iterations_check", result.n_iterations_check)
+        result.n_checks_save            = data.get("n_checks_save", result.n_checks_save)
+        result.total_iterations         = data.get("total_iterations", result.total_iterations)
+        result.target_noi               = data.get("target_noi", result.target_noi)
+        result.convergence              = data.get("convergence", result.convergence)
+        result.max_total_iterations     = data.get("max_total_iterations", result.max_total_iterations)
+        result.chain_file               = data.get("chain_file", result.chain_file)
+        result.initial_chain_file       = data.get("initial_chain_file", result.initial_chain_file)
+        result.output_tag               = data.get("output_tag", result.output_tag)
+        result.allow_split              = data.get("allow_split", result.allow_split)
+        result.child_indices            = data.get("child_indices", result.child_indices)
+        result.moving_endpoints         = data.get("moving_endpoints", result.moving_endpoints)
+        result.image_types              = data.get("image_types", result.image_types)
+        result.delta_Rx_left            = data.get("delta_Rx_left", result.delta_Rx_left)
+        result.delta_Rx_right           = data.get("delta_Rx_right", result.delta_Rx_right)
+        result.path_shortening_constant = data.get("path", result.path_shortening_constant)
 
         result.log("Created from json file {}".format(json_file))
 
-        for i in range(len(child_indices)):
+        for i in range(len(result.child_indices)):
             new_json_file = result.output_folder + "/{}/node.json".format(i)
             GNEB_Node.from_json(new_json_file, parent=result)
 
