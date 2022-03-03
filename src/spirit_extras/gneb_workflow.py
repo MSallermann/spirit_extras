@@ -495,9 +495,22 @@ class GNEB_Node(NodeMixin):
         condition_convergence = not self._converged
 
         if self.allow_split: # Only care about minima if splitting is allowed
-            return condition_minima and condition_iterations and condition_convergence
+            result = condition_minima and condition_iterations and condition_convergence
         else:
-            return condition_iterations and condition_convergence
+            result = condition_iterations and condition_convergence
+
+        if not result: # We are stopping and log the reason
+            reason = ""
+            if self.allow_split and not condition_minima:
+                reason = "Intermediate minima found"
+            elif not condition_iterations:
+                reason = "Max. Iterations reached"
+            elif not condition_convergence:
+                reason = "Converged"
+
+            self.log("Stop running. Reason: {}".format( reason ))
+
+        return result
 
     def run(self):
         """Run GNEB with checks after a certain number of iterations"""
@@ -564,10 +577,7 @@ class GNEB_Node(NodeMixin):
 
                 self.update_energy_path(p_state)
 
-                if self._converged:
-                    self.log("Converged!")
-                else:
-                    self.spawn_children(p_state)
+                self.spawn_children(p_state)
 
                 self.save_chain(p_state)
 
