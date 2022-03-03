@@ -453,7 +453,7 @@ class GNEB_Node(NodeMixin):
                 self.noi = chain.get_noi(p_state)
 
             self.log("Number of images = {}".format(self.noi))
-            io.chain_write(p_state, self.chain_file)
+            self.save_chain(p_state)
 
     def _prepare_state(self, p_state):
         """Prepares the state and reads in the chain."""
@@ -624,7 +624,7 @@ class GNEB_Node(NodeMixin):
                     chain.pop_back(p_state)
 
             self.update_energy_path(p_state)
-            io.chain_write(p_state, self.chain_file)
+            self.save_chain(p_state)
 
     def clamp_and_refine(self, convergence=None, max_total_iterations=None, idx_max_list=None, apply_ci=True, target_noi=5):
         """One step of clamp and refine algorithm"""
