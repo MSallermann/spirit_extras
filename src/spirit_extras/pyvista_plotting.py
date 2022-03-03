@@ -46,7 +46,6 @@ def save_to_png(image_file_name, mesh_list):
 
     plotter.show(screenshot=image_file_name + ".png")
 
-
 def plot_color_sphere(image_file_name, spin_to_rgba_func):
     import pyvista as pv
 
@@ -64,3 +63,115 @@ def plot_color_sphere(image_file_name, spin_to_rgba_func):
     plotter.add_mesh(sphere, scalars="spins_rgba", specular=0.7, ambient=0.4, specular_power=5, rgb=True, smooth_shading=True)
     plotter.set_background("white")
     plotter.show(screenshot=image_file_name + ".png")
+
+import pyvista as pv
+class Spin_Plotter:
+
+    def __init__(self, system):
+        self._point_cloud = create_point_cloud(system)
+        self._delaunay    = None
+
+        self.meshlist = []
+
+        self.camera_position = None
+        self.camera_azimuth = None
+        self.camera_elevation = None
+
+        self._preimages       = []
+
+        self.default_render_args = dict(scalars = "spins_rgba", rgb = True, specular=0.7, ambient=0.4, specular_power=5, smooth_shading=True, show_scalar_bar=False, show_edges=False)
+
+    def compute_delaunay(self):
+        self._delaunay = delaunay(self._point_cloud)
+
+    def save_delaunay(self, path):
+        self._delaunay.save(path)
+
+    def load_delaunay(self, path):
+        self._delaunay = pv.read(path)
+        self._delaunay.copy_attributes( self._point_cloud )
+
+    def update_spins(self, system):
+        self._point_cloud["spins_x"]    = spin_system.spins[:,0]
+        self._point_cloud["spins_y"]    = spin_system.spins[:,1]
+        self._point_cloud["spins_z"]    = spin_system.spins[:,2]
+        self._point_cloud["spins"]      = spin_system.spins
+        self._point_cloud["spins_rgba"] = get_rgba_colors( spin_system.spins, opacity=1.0 )
+
+        if self._delaunay:
+            self._delaunay.copy_attributes( self._point_cloud )
+
+    def isosurface(self, isovalue, scalars_key, render_args=None):
+        if not self._delaunay:
+            raise Exception("No delaunay")
+
+        if render_args is None:
+            render_args = self.default_render_args.copy()
+
+        temp = [isosurface_from_delaunay(self._delaunay, isovalue, scalars_key), render_args]
+        self.meshlist.append(temp)
+
+    def arrows(self, render_args=None):
+
+        if render_args is None:
+            render_args = self.default_render_args.copy()
+
+        temp = [arrows_from_point_cloud(self._point_cloud), render_args]
+        self.meshlist.append( temp )
+
+    def add_preimage(self, spin_dir, tol=0.05, render_args=None):
+        if not self._delaunay:
+            raise Exception("No delaunay")
+
+        if render_args is None:
+            render_args = self.default_render_args.copy()
+
+        temp = [create_pre_image(spin_dir, self._point_cloud, self._delaunay, tol), render_args]
+        self.meshlist.append( temp )
+
+    def show(self):
+        plotter = pv.Plotter(shape=(1,1))
+
+        for m, args in self.meshlist:
+            try:
+                plotter.add_mesh(m, **args)
+            except Exception as e:
+                print(f"Could not add_mesh {m}")
+                print(e)
+
+        if not self.camera_position is None:
+            plotter.camera_position = self.camera_position
+
+        if not self.camera_azimuth is None:
+            plotter.camera.azimuth = self.camera_azimuth
+
+        if not self.camera_elevation is None:
+            plotter.camera.elevation = self.camera_elevation
+
+        plotter.set_background("white")
+        plotter.add_axes(color="black", line_width=6)
+        plotter.show()
+
+    def render_to_png(self, png_path ):
+        pv.start_xvfb()
+        plotter = pv.Plotter(off_screen=True, shape=(1,1))
+
+        for m, args in self.meshlist:
+            try:
+                plotter.add_mesh(m, **args)
+            except Exception as e:
+                print(f"Could not add_mesh {m}")
+                print(e)
+
+        if not self.camera_position is None:
+            plotter.camera_position = self.camera_position
+
+        if not self.camera_azimuth is None:
+            plotter.camera.azimuth = self.camera_azimuth
+
+        if not self.camera_elevation is None:
+            plotter.camera.elevation = self.camera_elevation
+
+        plotter.set_background("white")
+        plotter.add_axes(color="black", line_width=6)
+        plotter.show(screenshot= png_path + ".png")
