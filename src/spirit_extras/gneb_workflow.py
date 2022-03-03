@@ -18,6 +18,8 @@ class GNEB_Node(NodeMixin):
     """A class that represents a GNEB calculation on a single chain. Can spawn children if cutting of the chain becomes necessary."""
 
     def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
+        from spirit import simulation
+
         """Constructor."""
         self.chain_file : str             = ""
         self.initial_chain_file : str     = ""
@@ -49,6 +51,8 @@ class GNEB_Node(NodeMixin):
         self._converged          = False
         self.image_types         = []
         self.history = []
+        self.solver_llg  = simulation.SOLVER_LBFGS_OSO
+        self.solver_gneb = simulation.SOLVER_VP_OSO
 
         # Create output folder
         if not os.path.exists(output_folder):
@@ -109,7 +113,7 @@ class GNEB_Node(NodeMixin):
 
         def before_gneb_cb(gnw, p_state):
             # gneb.set_image_type_automatically(p_state)
-            simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP, n_iterations=1)
+            simulation.start(p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=1)
             gnw.current_energy_path = data.energy_path_from_p_state(p_state)
             plotting.plot_energy_path(gnw.current_energy_path, plt.gca())
             mark_climbing_image(p_state, gnw, plt.gca())
@@ -210,26 +214,28 @@ class GNEB_Node(NodeMixin):
         self.log("Saving to {}".format(json_file))
 
         node_dict = dict(
-            name                   = str(self.name),
-            chain_file             = str(self.chain_file),
-            initial_chain_file     = str(self.initial_chain_file),
-            input_file             = str(self.input_file),
-            gneb_workflow_log_file = str(self.gneb_workflow_log_file),
-            n_iterations_check     = int(self.n_iterations_check),
-            n_checks_save          = int(self.n_checks_save),
-            total_iterations       = int(self.total_iterations),
-            target_noi             = int(self.target_noi),
-            convergence            = float(self.convergence),
-            max_total_iterations   = int(self.max_total_iterations),
-            output_folder          = str(self.output_folder),
-            output_tag             = str(self.output_tag),
-            child_indices          = [(int(c1), int(c2)) for c1, c2 in self.child_indices],
-            allow_split            = bool(self.allow_split),
+            name                     = str(self.name),
+            chain_file               = str(self.chain_file),
+            initial_chain_file       = str(self.initial_chain_file),
+            input_file               = str(self.input_file),
+            gneb_workflow_log_file   = str(self.gneb_workflow_log_file),
+            n_iterations_check       = int(self.n_iterations_check),
+            n_checks_save            = int(self.n_checks_save),
+            total_iterations         = int(self.total_iterations),
+            target_noi               = int(self.target_noi),
+            convergence              = float(self.convergence),
+            max_total_iterations     = int(self.max_total_iterations),
+            output_folder            = str(self.output_folder),
+            output_tag               = str(self.output_tag),
+            child_indices            = [(int(c1), int(c2)) for c1, c2 in self.child_indices],
+            allow_split              = bool(self.allow_split),
             path_shortening_constant = float(self.path_shortening_constant),
-            moving_endpoints       = bool(self.moving_endpoints),
-            delta_Rx_left          = float(self.delta_Rx_left),
-            delta_Rx_right         = float(self.delta_Rx_right),
-            image_types            = self.image_types
+            moving_endpoints         = bool(self.moving_endpoints),
+            delta_Rx_left            = float(self.delta_Rx_left),
+            delta_Rx_right           = float(self.delta_Rx_right),
+            image_types              = self.image_types,
+            solver_llg               = int(self.solver_llg),
+            solver_gneb              = int(self.solver_gneb)
         )
 
         with open(json_file, "w") as f:
@@ -266,6 +272,8 @@ class GNEB_Node(NodeMixin):
         result.delta_Rx_left            = data.get("delta_Rx_left", result.delta_Rx_left)
         result.delta_Rx_right           = data.get("delta_Rx_right", result.delta_Rx_right)
         result.path_shortening_constant = data.get("path", result.path_shortening_constant)
+        result.solver_llg               = data.get("solver_llg", result.solver_llg)
+        result.solver_gneb              = data.get("solver_gneb", result.solver_gneb)
 
         result.log("Created from json file {}".format(json_file))
 
@@ -368,7 +376,7 @@ class GNEB_Node(NodeMixin):
 
         self.log("Relaxing intermediate minima")
         for idx_minimum in self.intermediate_minima:
-            simulation.start(p_state, simulation.METHOD_LLG, simulation.SOLVER_LBFGS_OSO, idx_image = idx_minimum)
+            simulation.start(p_state, simulation.METHOD_LLG, self.solver_llg, idx_image = idx_minimum)
 
         # Instantiate the GNEB nodes
         noi = chain.get_noi(p_state)
@@ -517,7 +525,7 @@ class GNEB_Node(NodeMixin):
                     n_checks = 0
                     while(self.check_run_condition()):
 
-                        info = simulation.start(p_state, simulation.METHOD_GNEB, simulation.SOLVER_VP_OSO, n_iterations=self.n_iterations_check)
+                        info = simulation.start(p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=self.n_iterations_check)
                         self.update_energy_path(p_state)
                         self.check_for_minima() # Writes the intermediate minima list
                         n_checks += 1
