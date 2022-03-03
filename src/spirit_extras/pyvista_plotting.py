@@ -73,13 +73,42 @@ class Spin_Plotter:
 
         self.meshlist = []
 
-        self.camera_position = None
-        self.camera_azimuth = None
-        self.camera_elevation = None
+        self.camera_position    = None
+        self.camera_up          = None
+        self.camera_focal_point = None
+        self.camera_azimuth     = None
+        self.camera_elevation   = None
+        self.camera_distance        = None
+        self.camera_view_angle        = None
 
         self._preimages       = []
 
-        self.default_render_args = dict(scalars = "spins_rgba", rgb = True, specular=0.7, ambient=0.4, specular_power=5, smooth_shading=True, show_scalar_bar=False, show_edges=False)
+        self.default_render_args = dict(scalars = "spins_rgba", rgb = True, specular=0.0, ambient=0.7, specular_power=5, smooth_shading=True, show_scalar_bar=False, show_edges=False)
+
+    def camera_from_json(self, save_camera_file):
+        with open(save_camera_file, "r") as f:
+            data = json.load(f)
+        self.camera_position = data["position"]
+        self.camera_up = data["up"]
+        self.camera_focal_point = data["focal_point"]
+        self.camera_distance = data["distance"]
+        self.camera_view_angle = data["view_angle"]
+
+    def set_camera(self, plotter):
+        if not self.camera_position is None:
+            plotter.camera.position = self.camera_position
+        if not self.camera_azimuth is None:
+            plotter.camera.azimuth = self.camera_azimuth
+        if not self.camera_elevation is None:
+            plotter.camera.elevation = self.camera_elevation
+        if not self.camera_focal_point is None:
+            plotter.camera.focal_point = self.camera_focal_point
+        if not self.camera_up is None:
+            plotter.camera.up = self.camera_up
+        if not self.camera_distance is None:
+            plotter.camera.distance = self.camera_distance
+        if not self.camera_view_angle is None:
+            plotter.camera.view_angle = self.camera_view_angle
 
     def compute_delaunay(self):
         self._delaunay = delaunay(self._point_cloud)
@@ -91,7 +120,7 @@ class Spin_Plotter:
         self._delaunay = pv.read(path)
         self._delaunay.copy_attributes( self._point_cloud )
 
-    def update_spins(self, system):
+    def update_spins(self, spin_system):
         self._point_cloud["spins_x"]    = spin_system.spins[:,0]
         self._point_cloud["spins_y"]    = spin_system.spins[:,1]
         self._point_cloud["spins_z"]    = spin_system.spins[:,2]
@@ -129,8 +158,9 @@ class Spin_Plotter:
         temp = [create_pre_image(spin_dir, self._point_cloud, self._delaunay, tol), render_args]
         self.meshlist.append( temp )
 
-    def show(self):
+    def show(self, save_camera_file=None):
         plotter = pv.Plotter(shape=(1,1))
+        self.set_camera(plotter)
 
         for m, args in self.meshlist:
             try:
@@ -138,23 +168,30 @@ class Spin_Plotter:
             except Exception as e:
                 print(f"Could not add_mesh {m}")
                 print(e)
-
-        if not self.camera_position is None:
-            plotter.camera_position = self.camera_position
-
-        if not self.camera_azimuth is None:
-            plotter.camera.azimuth = self.camera_azimuth
-
-        if not self.camera_elevation is None:
-            plotter.camera.elevation = self.camera_elevation
 
         plotter.set_background("white")
         plotter.add_axes(color="black", line_width=6)
         plotter.show()
+        print(f"position    = {plotter.camera.position}")
+        print(f"up          = {plotter.camera.up}")
+        print(f"focal_point = {plotter.camera.focal_point}")
+        print(f"distance = {plotter.camera.distance}")
+
+        if save_camera_file is not None:
+            camera_dict = dict(
+                position = plotter.camera.position,
+                up = plotter.camera.up,
+                focal_point = plotter.camera.focal_point,
+                distance = plotter.camera.distance,
+                view_angle = plotter.camera.view_angle
+            )
+            with open(save_camera_file, "w") as f:
+                f.write(json.dumps(camera_dict, indent=4))
 
     def render_to_png(self, png_path ):
         pv.start_xvfb()
         plotter = pv.Plotter(off_screen=True, shape=(1,1))
+        self.set_camera(plotter)
 
         for m, args in self.meshlist:
             try:
@@ -162,15 +199,6 @@ class Spin_Plotter:
             except Exception as e:
                 print(f"Could not add_mesh {m}")
                 print(e)
-
-        if not self.camera_position is None:
-            plotter.camera_position = self.camera_position
-
-        if not self.camera_azimuth is None:
-            plotter.camera.azimuth = self.camera_azimuth
-
-        if not self.camera_elevation is None:
-            plotter.camera.elevation = self.camera_elevation
 
         plotter.set_background("white")
         plotter.add_axes(color="black", line_width=6)
