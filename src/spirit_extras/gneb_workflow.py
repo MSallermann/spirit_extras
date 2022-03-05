@@ -233,7 +233,7 @@ class GNEB_Node(NodeMixin):
             moving_endpoints         = bool(self.moving_endpoints),
             delta_Rx_left            = float(self.delta_Rx_left),
             delta_Rx_right           = float(self.delta_Rx_right),
-            image_types              = self.image_types,
+            image_types              = [ [int(t[0]), int(t[1]) ] for t in self.image_types],
             solver_llg               = int(self.solver_llg),
             solver_gneb              = int(self.solver_gneb)
         )
@@ -486,6 +486,7 @@ class GNEB_Node(NodeMixin):
 
         # Set image types
         for idx_image, image_type in self.image_types:
+            self.log("Set type of image {} to {}".format(idx_image, image_type))
             parameters.gneb.set_climbing_falling(p_state, image_type, idx_image)
 
     def check_run_condition(self):
