@@ -47,12 +47,15 @@ class GNEB_Node(NodeMixin):
         self.before_llg_callback    = None
         self.intermediate_minima = []
         self.child_indices       = []
-        self._ci                 = False
-        self._converged          = False
         self.image_types         = []
-        self.history = []
+        self.history             = []
         self.solver_llg  = simulation.SOLVER_LBFGS_OSO
         self.solver_gneb = simulation.SOLVER_VP_OSO
+
+        # private fields
+        self._ci                 = False
+        self._converged          = False
+        self._log                = True # flag to disable/enable logging
 
         # Create output folder
         if not os.path.exists(output_folder):
@@ -285,11 +288,19 @@ class GNEB_Node(NodeMixin):
 
     def log(self, message):
         """Append a message with date/time information to the log file."""
+        if not self._log:  # if log flag is not set, do nothing
+            return
         now = datetime.now()
         current_time = now.strftime("%m/%d/%Y, %H:%M:%S")
         log_string = "{} [{:^35}] : {}".format(current_time, self.name, message)
         with open(self.gneb_workflow_log_file, "a") as f:
             print(log_string, file=f)
+
+    def enable_log(self):
+        self._log = True
+
+    def disable_log(self):
+        self._log = False
 
     def update_energy_path(self, p_state=None):
         """Updates the current energy path. If p_state is given we just use that, otherwise we have to construct it first"""
@@ -297,8 +308,9 @@ class GNEB_Node(NodeMixin):
             self.current_energy_path = energy_path_from_p_state(p_state)
             self.noi = self.current_energy_path.noi()
         else:
-            from spirit import state, io
+            from spirit import state, io, chain
             with state.State(self.input_file) as p_state:
+                chain.update_data(p_state)
                 self._prepare_state(p_state)
                 self.update_energy_path(p_state)
 
