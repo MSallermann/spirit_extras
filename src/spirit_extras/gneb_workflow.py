@@ -69,8 +69,7 @@ class GNEB_Node(NodeMixin):
         if(initial_chain_file):
             if not os.path.exists(initial_chain_file):
                 raise Exception("Initial chain file ({}) does not exist!".format(initial_chain_file))
-            self.initial_chain_file = output_folder + "/root_initial_chain.ovf"
-            shutil.copyfile(initial_chain_file, self.initial_chain_file)
+            self.initial_chain_file = initial_chain_file
             shutil.copyfile(initial_chain_file, self.chain_file)
 
         self.input_file = input_file
@@ -332,6 +331,14 @@ class GNEB_Node(NodeMixin):
         from spirit import io
         self.log("Writing chain to {}".format(self.chain_file))
         io.chain_write(p_state, self.chain_file)
+
+    def backup_chain(self, path):
+        """Saves the chain to a file"""
+        from spirit import state, io
+        with state.State(self.input_file) as p_state:
+            self._prepare_state(p_state)
+            self.log("Writing chain to {}".format(path))
+            io.chain_write(p_state, path)
 
     def add_child(self, i1, i2, p_state=None):
 
@@ -610,10 +617,10 @@ class GNEB_Node(NodeMixin):
         from spirit import chain, io, state, parameters
 
         self.log("Preparing for moving endpoints")
-        chain_backup_path = os.path.join(self.output_folder, "chain_backup.ovf")
-        self.log("    Making backup copy of chain in {}".format(chain_backup_path))
 
-        shutil.copy(self.chain_file, chain_backup_path)
+        # chain_backup_path = os.path.join(self.output_folder, "chain_backup.ovf")
+        # self.log("    Making backup copy of chain in {}".format(chain_backup_path))
+        # shutil.copy(self.chain_file, chain_backup_path)
 
         self.target_noi       = 3
         self.moving_endpoints = True
