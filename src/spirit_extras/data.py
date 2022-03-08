@@ -151,6 +151,14 @@ class energy_path:
         split_path.total_energy        = np.array(self.total_energy[idx_0:idx_1])
         return split_path
 
+    def slope(self):
+        result = np.gradient(self.total_energy, self.reaction_coordinate)
+        return result
+
+    def curvature(self):
+        result = np.gradient(self.slope(), self.reaction_coordinate)
+        return result
+
     def barrier(self):
         return np.max(self.total_energy) - self.total_energy[0]
 
