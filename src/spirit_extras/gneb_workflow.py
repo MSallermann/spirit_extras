@@ -18,7 +18,7 @@ class GNEB_Node(NodeMixin):
     """A class that represents a GNEB calculation on a single chain. Can spawn children if cutting of the chain becomes necessary."""
 
     def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
-        from spirit import simulation
+        from spirit import simulation, io
 
         """Constructor."""
         self.chain_file : str             = ""
@@ -51,6 +51,7 @@ class GNEB_Node(NodeMixin):
         self.history             = []
         self.solver_llg  = simulation.SOLVER_LBFGS_OSO
         self.solver_gneb = simulation.SOLVER_VP_OSO
+        self.chain_write_fileformat = io.FILEFORMAT_OVF_BIN
 
         # private fields
         self._ci                 = False
@@ -237,7 +238,8 @@ class GNEB_Node(NodeMixin):
             delta_Rx_right           = float(self.delta_Rx_right),
             image_types              = [ [int(t[0]), int(t[1]) ] for t in self.image_types],
             solver_llg               = int(self.solver_llg),
-            solver_gneb              = int(self.solver_gneb)
+            solver_gneb              = int(self.solver_gneb),
+            fileformat               = int(self.chain_write_fileformat)
         )
 
         with open(json_file, "w") as f:
@@ -276,6 +278,7 @@ class GNEB_Node(NodeMixin):
         result.path_shortening_constant = data.get("path", result.path_shortening_constant)
         result.solver_llg               = data.get("solver_llg", result.solver_llg)
         result.solver_gneb              = data.get("solver_gneb", result.solver_gneb)
+        result.chain_write_fileformat   = data.get("fileformat", result.chain_write_fileformat)
 
         result.log("Created from json file {}".format(json_file))
 
@@ -330,7 +333,7 @@ class GNEB_Node(NodeMixin):
         """Saves the chain and overwrites the chain_file"""
         from spirit import io
         self.log("Writing chain to {}".format(self.chain_file))
-        io.chain_write(p_state, self.chain_file)
+        io.chain_write(p_state, self.chain_file, fileformat=self.chain_write_fileformat)
 
     def backup_chain(self, path):
         """Saves the chain to a file"""
@@ -338,7 +341,7 @@ class GNEB_Node(NodeMixin):
         with state.State(self.input_file) as p_state:
             self._prepare_state(p_state)
             self.log("Writing chain to {}".format(path))
-            io.chain_write(p_state, path)
+            io.chain_write(p_state, path, fileformat=self.chain_write_fileformat)
 
     def add_child(self, i1, i2, p_state=None):
 
@@ -363,9 +366,11 @@ class GNEB_Node(NodeMixin):
             self.children[-1].n_iterations_check     = self.n_iterations_check
             self.children[-1].n_checks_save          = self.n_checks_save
             self.children[-1].allow_split            = self.allow_split
+            self.children[-1].chain_write_fileformat = self.chain_write_fileformat
+
             self.child_indices.append([i1, i2])
             # Write the chain file
-            chain_write_between(p_state, self.children[-1].chain_file, i1, i2)
+            chain_write_between(p_state, self.children[-1].chain_file, i1, i2, fileformat=self.chain_write_fileformat)
 
         if p_state:
             _helper(p_state)
