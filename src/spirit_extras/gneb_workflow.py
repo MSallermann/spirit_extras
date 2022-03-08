@@ -635,9 +635,10 @@ class GNEB_Node(NodeMixin):
             self._prepare_state(p_state)
             self.update_energy_path(p_state)
 
+            noi = chain.get_noi(p_state)
+
             if idx_mid < 0:
                 E = chain.get_energy(p_state)
-                noi = chain.get_noi(p_state)
                 idx_mid = np.argmax(E)
 
             self.log("    idx_mid = {}".format(idx_mid))
