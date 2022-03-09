@@ -155,9 +155,20 @@ class energy_path:
         result = np.gradient(self.total_energy, self.reaction_coordinate)
         return result
 
+    def interpolated_slope(self):
+        result = np.gradient(self.interpolated_total_energy, self.interpolated_reaction_coordinate)
+        return result
+
     def curvature(self):
         result = np.gradient(self.slope(), self.reaction_coordinate)
         return result
+
+    def interpolated_curvature(self):
+        result = np.gradient(self.interpolated_slope(), self.interpolated_reaction_coordinate)
+        return result
+
+    def n_interpolated(self):
+        return int( ( len(self.interpolated_reaction_coordinate) - self.noi() ) / (self.noi() - 1) )
 
     def barrier(self):
         return np.max(self.total_energy) - self.total_energy[0]
