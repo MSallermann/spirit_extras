@@ -306,15 +306,18 @@ class GNEB_Node(NodeMixin):
 
     def update_energy_path(self, p_state=None):
         """Updates the current energy path. If p_state is given we just use that, otherwise we have to construct it first"""
+        self._log = False
         if p_state:
             self.current_energy_path = energy_path_from_p_state(p_state)
             self.noi = self.current_energy_path.noi()
         else:
-            from spirit import state, io, chain
+            from spirit import state, chain, simulation
             with state.State(self.input_file) as p_state:
                 chain.update_data(p_state)
                 self._prepare_state(p_state)
+                simulation.start(p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=1) # One iteration of GNEB to get interpolated quantities
                 self.update_energy_path(p_state)
+        self._log = True
 
     def check_for_minima(self):
         """
