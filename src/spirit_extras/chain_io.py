@@ -2,7 +2,7 @@ def chain_write_between(p_state, filename, idx_start, idx_stop, fileformat=None)
     """Writes the chain between idx_start and idx_stop to a file. Includes the endpoints!"""
     from spirit import io, chain
 
-    if not fileformat:
+    if fileformat is None:
         fileformat = io.FILEFORMAT_OVF_TEXT
 
     noi = chain.get_noi(p_state)
@@ -19,7 +19,7 @@ def chain_write_split_at(p_state, filename_list, idx_list, fileformat=None):
     """Writes a chain split at each index in idx_list"""
     from spirit import io, chain
 
-    if not fileformat:
+    if fileformat is None:
         fileformat = io.FILEFORMAT_OVF_TEXT
 
     if(len(filename_list) != len(idx_list)-1):
