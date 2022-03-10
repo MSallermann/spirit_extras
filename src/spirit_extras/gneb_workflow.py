@@ -248,6 +248,9 @@ class GNEB_Node(NodeMixin):
         for c in self.children:
             c.to_json()
 
+    def history_to_file(self, path):
+        np.savetxt(path, self.history, header="iteration, max. torque" )
+
     @staticmethod
     def from_json(json_file, parent=None, children=None):
 
@@ -644,7 +647,7 @@ class GNEB_Node(NodeMixin):
                 E = chain.get_energy(p_state)
                 idx_mid = np.argmax(E)
 
-            self.log("    idx_mid = {}".format(idx_mid))
+            self.log("idx_mid = {}".format(idx_mid))
 
             if(idx_mid >= 1 and idx_mid < noi-1):
                 for i in range(idx_mid-1):
