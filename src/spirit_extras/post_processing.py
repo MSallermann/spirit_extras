@@ -90,13 +90,12 @@ def skyrmion_circularity( positions, spins, center, z_value = 0, background_dire
     return result
 
 
-def hopfion_normal(p_state, background_direction = [0,0,1], background_angle_diff = np.pi/4):
+def hopfion_normal(spin_system, background_direction = [0,0,1], background_angle_diff = np.pi/4):
     """ Try to compute the center and normal of a Hopfion"""
-    from spirit import system, geometry
     bg = np.array(background_direction)
 
-    spins     = system.get_spin_directions(p_state)
-    positions = np.array(geometry.get_positions(p_state))
+    spins     = spin_system.spins
+    positions = spin_system.positions
 
     background_mask  = [ np.arccos(np.dot( bg, s )) > background_angle_diff for s in spins ]
     masked_positions = positions[background_mask]
@@ -119,3 +118,117 @@ def hopfion_normal(p_state, background_direction = [0,0,1], background_angle_dif
     normal_opt = np.array( [np.cos(phi) * np.sin(theta), np.sin(phi) * np.sin(theta), np.cos(theta)] )
 
     return center, normal_opt
+
+
+def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_neighbours=10):
+
+    ## BEGIN
+    def find_best_neighbour(neighbour_indices, distances, positions, last_segment):
+        """iterate over the neighbours and find the best one"""
+        segments = np.zeros(shape = (len(neighbour_indices),3))
+
+        i_best = 0
+        idx_neigh_best = 0
+        angle_min = 999
+
+        for i,idx_neigh in enumerate(neighbour_indices):
+            # Compute the test segment
+            test_segment = positions[ idx_neigh ] - positions[ pre_image[-1] ]
+            test_segment /= np.linalg.norm( test_segment )
+            segments[i] = test_segment
+
+            # Find the segment that gives the smoothest path (smalles angle to the previous segment)
+            angle = np.arccos( np.dot( last_segment, test_segment ) )
+            if np.isnan(angle):
+                angle = 0
+
+            if angle < angle_min:
+                angle_min = angle
+                idx_neigh_best = idx_neigh
+                i_best = i
+
+        return i_best, idx_neigh_best, segments
+
+    def exclude_indices(neighbour_indices, distances, segments, segment_best, distance_best):
+        """Finds the neighbour_indices which should be excluded from subsequen pre-image searches"""
+        in_path_direction = [ np.dot(segment_best, s) > 0 for s in segments ]
+        less_distant      = distances <= distance_best
+        excluded_indices  = neighbour_indices[ np.logical_and(in_path_direction, less_distant) ]
+        return excluded_indices
+    ## END
+
+    from scipy.spatial import KDTree
+
+    pre_image_spin = np.array( pre_image_spin ) / np.linalg.norm( pre_image_spin )
+
+    angles = np.arccos( np.dot(spins, pre_image_spin) )
+
+    idx_converter = np.array(range( len(spins) ) )[ angles < angle_tolerance ]
+    positions     = positions[ angles < angle_tolerance ]
+    spins         = spins[ angles < angle_tolerance ]
+
+    if len(spins) < n_neighbours:
+        raise Exception("Not enough spins match pre-image spin")
+
+    angles        = np.arccos( np.dot(spins, pre_image_spin) )
+
+    tree = KDTree(positions)
+
+    # First two points of the preimage
+    angles    = np.arccos( np.dot(spins, pre_image_spin) ) # angles between spins and pre-image-spin
+    idx_first = np.argmin(angles)
+
+    # First spins is the one that best matches the pre-image-spin
+    distances, neighbour_indices = tree.query( positions[idx_first], k=n_neighbours )
+    neighbour_indices            = neighbour_indices[1:] # remove the point itself (distance zero from the distances and the neighbour indices)
+    distances                    = distances[1:]
+
+    angles_first_neigbours       = angles[ neighbour_indices ]
+
+
+    # Second spin is the one that, among the neighbours of the first spin, best matches the pre-image-spin
+    idx_second = neighbour_indices[ np.argmin( angles_first_neigbours ) ]
+
+    pre_image    = [ idx_first, idx_second ]
+    idx_excluded = [ idx_second ] # indices that are excluded from the pre-image search
+
+    last_segment = positions[ pre_image[-1] ] - positions[ pre_image[-2] ]
+    distance_best = np.linalg.norm( last_segment )
+    last_segment /= distance_best # direction of the last segment of the pre-image
+
+    segments = np.zeros(shape = (len(neighbour_indices),3))
+    for i,idx_neigh in enumerate(neighbour_indices):
+        segments[i] = positions[ idx_neigh ] - positions[ pre_image[0] ] # segment from idx_first to neighbour_index
+        segments[i] /= np.linalg.norm( segments[i] )
+
+    # Update exclude indices for first segment
+    idx_excluded.extend( exclude_indices( neighbour_indices, distances, segments, last_segment, distance_best ) )
+
+    RUN = True
+    while RUN:
+        last_segment = positions[ pre_image[-1] ] - positions[ pre_image[-2] ]
+        last_segment /= np.linalg.norm( last_segment ) # direction of the last segment of teh pre-image
+
+        distances, neighbour_indices = tree.query( positions[pre_image[-1]], k=n_neighbours )
+        neighbour_indices            = neighbour_indices[1:] # remove the point itself (distance zero from the distances and the neighbour indices)
+        distances                    = distances[1:]
+
+        # Remove the excluded indices
+        excluded          = np.isin(neighbour_indices, idx_excluded)
+        neighbour_indices = neighbour_indices[~excluded]
+        distances         = distances[~excluded]
+
+        if len(neighbour_indices) == 0:
+            RUN = False
+            continue
+
+        i_best, idx_neigh_best, segments = find_best_neighbour(neighbour_indices, distances, positions, last_segment)
+        pre_image.append(idx_neigh_best)
+
+    
+        idx_excluded.extend( exclude_indices( neighbour_indices, distances, segments, segments[i_best], distances[i_best]  ) )
+
+
+    return idx_converter[ pre_image ], positions[ pre_image ]
+
+    print(pre_image)
