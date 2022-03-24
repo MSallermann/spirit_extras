@@ -27,10 +27,11 @@ def arrows_from_point_cloud(point_cloud):
     arrows = point_cloud.glyph(orient="spins", scale=False, factor=1, geom=geom)
     return arrows
 
-def create_pre_image(pre_image_spin, delaunay, tol=0.05):
+def create_pre_image(pre_image_spin, point_cloud, tol=0.05):
+    from .post_processing import compute_pre_image
     import pyvista as pv
-    pre_image_spin = np.array(pre_image_spin) / np.linalg.norm(pre_image_spin)
-    return delaunay.contour([pre_image_spin[0]], scalars="spins_x").contour([pre_image_spin[1]], scalars="spins_y").threshold( [pre_image_spin[2]-tol, pre_image_spin[2]+tol], scalars="spins_z" )
+    positions = compute_pre_image( point_cloud.points, point_cloud["spins"], pre_image_spin )[1]
+    return pv.Spline(positions).tube(radius=0.3)
 
 def save_to_png(image_file_name, mesh_list):
     import pyvista as pv
@@ -78,8 +79,8 @@ class Spin_Plotter:
         self.camera_focal_point = None
         self.camera_azimuth     = None
         self.camera_elevation   = None
-        self.camera_distance        = None
-        self.camera_view_angle        = None
+        self.camera_distance    = None
+        self.camera_view_angle  = None
 
         self._preimages       = []
 
@@ -155,7 +156,7 @@ class Spin_Plotter:
         if render_args is None:
             render_args = self.default_render_args.copy()
 
-        temp = [create_pre_image(spin_dir, self._point_cloud, self._delaunay, tol), render_args]
+        temp = [create_pre_image(spin_dir, self._point_cloud), render_args]
         self.meshlist.append( temp )
 
     def show(self, save_camera_file=None):
