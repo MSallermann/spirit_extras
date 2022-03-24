@@ -112,11 +112,11 @@ class Spin_System:
         result.unordered       = False
         return result.flattened()
 
-def spin_system_from_p_state(p_state, copy=False):
+def spin_system_from_p_state(p_state, idx_image=-1, copy=False):
     from spirit import geometry, system
     spin_system = Spin_System()
-    spin_system.positions     = geometry.get_positions(p_state)
-    spin_system.spins         = system.get_spin_directions(p_state)
+    spin_system.positions     = geometry.get_positions(p_state, idx_image = idx_image)
+    spin_system.spins         = system.get_spin_directions(p_state, idx_image = idx_image)
     spin_system.n_cell_atoms  = geometry.get_n_cell_atoms(p_state)
     spin_system.n_cells       = geometry.get_n_cells(p_state)
 
