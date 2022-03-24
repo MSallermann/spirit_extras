@@ -37,7 +37,8 @@ class GNEB_Node(NodeMixin):
         self.output_folder = ""
         self.output_tag    = ""
         self.allow_split = True
-        self.moving_endpoints       = False
+        self.moving_endpoints       = None
+        self.translating_endpoints  = None
         self.delta_Rx_left          = 1.0
         self.delta_Rx_right         = 1.0
         self.state_prepare_callback = None
@@ -497,7 +498,10 @@ class GNEB_Node(NodeMixin):
 
         if self.moving_endpoints is not None:
             parameters.gneb.set_moving_endpoints(p_state, self.moving_endpoints)
-            parameters.gneb.set_equilibrium_delta_Rx(p_state, self.delta_Rx_left, self.delta_Rx_right)
+            if self.translating_endpoints is not None:
+                parameters.gneb.set_translating_endpoints(p_state, self.translating_endpoints)
+            if self.delta_Rx_left is not None and self.delta_Rx_right is not None:
+                parameters.gneb.set_equilibrium_delta_Rx(p_state, self.delta_Rx_left, self.delta_Rx_right)
 
         # The state prepare callback can be used to change the state before execution of any other commands
         # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
@@ -629,10 +633,6 @@ class GNEB_Node(NodeMixin):
 
         self.log("Preparing for moving endpoints")
 
-        # chain_backup_path = os.path.join(self.output_folder, "chain_backup.ovf")
-        # self.log("    Making backup copy of chain in {}".format(chain_backup_path))
-        # shutil.copy(self.chain_file, chain_backup_path)
-
         self.target_noi       = 3
         self.moving_endpoints = True
         self.image_types      = [[1, parameters.gneb.IMAGE_CLIMBING]]
@@ -654,6 +654,42 @@ class GNEB_Node(NodeMixin):
                     chain.delete_image(p_state, idx_image=0)
                 for i in range(noi - idx_mid - 2):
                     chain.pop_back(p_state)
+
+            self.update_energy_path(p_state)
+            self.save_chain(p_state)
+
+    def prepare_dimer(self, idx_left, idx_right=None):
+        from spirit import chain, io, state, parameters
+
+        if idx_right is None:
+            idx_right = idx_left + 1
+
+        self.log("Preparing for dimer endpoints")
+
+        self.target_noi            = 2
+        self.moving_endpoints      = True
+        self.translating_endpoints = True
+        self.image_types           = []
+
+        with state.State(self.input_file) as p_state:
+            self._prepare_state(p_state)
+            self.update_energy_path(p_state)
+
+            noi = chain.get_noi(p_state)
+
+            self.log("idx_left = {}, idx_right = {}".format(idx_left, idx_right))
+
+            # Delete all images to the right of idx right
+            for i in range(noi - idx_right - 1):
+                chain.pop_back(p_state)
+
+            # Delete all images to the left of idx_left
+            for i in range(idx_left):
+                chain.delete_image(p_state, idx_image=0)
+
+            # Delete images between idx_left and idx_right
+            for i in range(idx_right - idx_left - 1):
+                chain.delete_image(p_state, idx_image=1)
 
             self.update_energy_path(p_state)
             self.save_chain(p_state)
