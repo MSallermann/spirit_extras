@@ -137,7 +137,7 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
             test_segment /= np.linalg.norm( test_segment )
             segments[i] = test_segment
 
-            # Find the segment that gives the smoothest path (smalles angle to the previous segment)
+            # Find the segment that gives the smoothest path (smallest angle to the previous segment)
             angle = np.arccos( np.dot( last_segment, test_segment ) )
             if np.isnan(angle):
                 angle = 0
@@ -170,7 +170,7 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
     if len(spins) < n_neighbours:
         raise Exception("Not enough spins match pre-image spin")
 
-    angles        = np.arccos( np.dot(spins, pre_image_spin) )
+    angles = np.arccos( np.dot(spins, pre_image_spin) )
 
     tree = KDTree(positions)
 
@@ -182,9 +182,7 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
     distances, neighbour_indices = tree.query( positions[idx_first], k=n_neighbours )
     neighbour_indices            = neighbour_indices[1:] # remove the point itself (distance zero from the distances and the neighbour indices)
     distances                    = distances[1:]
-
     angles_first_neigbours       = angles[ neighbour_indices ]
-
 
     # Second spin is the one that, among the neighbours of the first spin, best matches the pre-image-spin
     idx_second = neighbour_indices[ np.argmin( angles_first_neigbours ) ]
@@ -196,7 +194,7 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
     distance_best = np.linalg.norm( last_segment )
     last_segment /= distance_best # direction of the last segment of the pre-image
 
-    segments = np.zeros(shape = (len(neighbour_indices),3))
+    segments = np.zeros(shape = (len(neighbour_indices), 3))
     for i,idx_neigh in enumerate(neighbour_indices):
         segments[i] = positions[ idx_neigh ] - positions[ pre_image[0] ] # segment from idx_first to neighbour_index
         segments[i] /= np.linalg.norm( segments[i] )
@@ -225,10 +223,6 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
         i_best, idx_neigh_best, segments = find_best_neighbour(neighbour_indices, distances, positions, last_segment)
         pre_image.append(idx_neigh_best)
 
-    
         idx_excluded.extend( exclude_indices( neighbour_indices, distances, segments, segments[i_best], distances[i_best]  ) )
 
-
     return idx_converter[ pre_image ], positions[ pre_image ]
-
-    print(pre_image)
