@@ -69,7 +69,6 @@ class GNEB_Node(NodeMixin):
 
         # If an initial chain is specified we copy it to the output folder
         if(initial_chain_file):
-            self.log("Using initial chain file: {}".format(initial_chain_file))
             if not os.path.exists(initial_chain_file):
                 raise Exception("Initial chain file ({}) does not exist!".format(initial_chain_file))
             self.initial_chain_file = initial_chain_file
@@ -97,6 +96,9 @@ class GNEB_Node(NodeMixin):
             for c in children:
                 creation_msg += "{} ".format(c.name)
         self.log(creation_msg)
+
+        if(initial_chain_file):
+            self.log("Initial chain file: {}".format(initial_chain_file))
 
     def setup_plot_callbacks(self):
         """Sets up callbacks such that the path is plotted."""
