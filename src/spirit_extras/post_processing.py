@@ -119,17 +119,16 @@ def hopfion_normal(spin_system, background_direction = [0,0,1], background_angle
 
     return center, normal_opt
 
-
-def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_neighbours=10):
+def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_neighbours=20):
 
     ## BEGIN
     def find_best_neighbour(neighbour_indices, distances, positions, last_segment):
         """iterate over the neighbours and find the best one"""
         segments = np.zeros(shape = (len(neighbour_indices),3))
 
-        i_best = 0
+        i_best         = 0
         idx_neigh_best = 0
-        angle_min = 999
+        angle_min      = 999
 
         for i,idx_neigh in enumerate(neighbour_indices):
             # Compute the test segment
@@ -178,7 +177,7 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
     angles    = np.arccos( np.dot(spins, pre_image_spin) ) # angles between spins and pre-image-spin
     idx_first = np.argmin(angles)
 
-    # First spins is the one that best matches the pre-image-spin
+    # First spin is the one that best matches the pre-image-spin
     distances, neighbour_indices = tree.query( positions[idx_first], k=n_neighbours )
     neighbour_indices            = neighbour_indices[1:] # remove the point itself (distance zero from the distances and the neighbour indices)
     distances                    = distances[1:]
@@ -205,7 +204,7 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
     RUN = True
     while RUN:
         last_segment = positions[ pre_image[-1] ] - positions[ pre_image[-2] ]
-        last_segment /= np.linalg.norm( last_segment ) # direction of the last segment of teh pre-image
+        last_segment /= np.linalg.norm( last_segment ) # direction of the last segment of the pre-image
 
         distances, neighbour_indices = tree.query( positions[pre_image[-1]], k=n_neighbours )
         neighbour_indices            = neighbour_indices[1:] # remove the point itself (distance zero from the distances and the neighbour indices)
@@ -217,6 +216,12 @@ def compute_pre_image(positions, spins, pre_image_spin, angle_tolerance=0.1, n_n
         distances         = distances[~excluded]
 
         if len(neighbour_indices) == 0:
+            RUN = False
+            continue
+
+        if pre_image[0] in neighbour_indices and np.dot(last_segment, positions[pre_image[0]] - positions[pre_image[-1]]) > 0:
+
+            pre_image.append( pre_image[0] )
             RUN = False
             continue
 
