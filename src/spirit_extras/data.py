@@ -83,7 +83,10 @@ class Spin_System:
             return temp
 
     def nos(self):
-        return len(self.spins)
+        if self.unordered:
+            return len(self.spins)
+        else:
+            return self.n_cells[0] * self.n_cells[1] * self.n_cells[2] * self.n_cell_atoms
 
     def center(self):
         return np.mean(self.flattened().positions, axis=0)
