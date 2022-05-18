@@ -69,6 +69,7 @@ class GNEB_Node(NodeMixin):
 
         # If an initial chain is specified we copy it to the output folder
         if(initial_chain_file):
+            self.log("Using initial chain file: {}".format(initial_chain_file))
             if not os.path.exists(initial_chain_file):
                 raise Exception("Initial chain file ({}) does not exist!".format(initial_chain_file))
             self.initial_chain_file = initial_chain_file
