@@ -32,7 +32,7 @@ class GNEB_Node(NodeMixin):
         self.n_iterations_check  = 5000
         self.n_checks_save       = 3
         self.total_iterations    = 0
-        self.target_noi  = 10
+        self.target_noi  = -1
         self.noi         = -1
         self.convergence = 1e-7
         self.path_shortening_constant = -1
