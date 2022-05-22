@@ -12,19 +12,22 @@ from .data import energy_path, energy_path_from_p_state
 from .util import set_output_folder
 from .chain_io import chain_write_between
 from datetime import datetime
+import uuid
 import json
 
 class GNEB_Node(NodeMixin):
     """A class that represents a GNEB calculation on a single chain. Can spawn children if cutting of the chain becomes necessary."""
 
-    def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None):
+    def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None, scratch_folder=None):
         from spirit import simulation, io
 
         """Constructor."""
         self.chain_file : str             = ""
+        self.chain_file_post_run : str    = ""
         self.initial_chain_file : str     = ""
         self.input_file : str             = ""
         self.gneb_workflow_log_file : str = ""
+        self.uuid                = uuid.uuid1()
         self.current_energy_path = object()
         self.n_iterations_check  = 5000
         self.n_checks_save       = 3
@@ -64,8 +67,19 @@ class GNEB_Node(NodeMixin):
             os.makedirs(output_folder)
         self.output_folder = output_folder
 
+        # If no scratch folder is specified, we use the output folder
+        # else we create a temporary folder in the scratch partition
+        if scratch_folder is None:
+            self.scratch_folder = self.output_folder
+        else:
+            self.scratch_folder = os.path.join(scratch_folder, self.name + "#" + str(self.uuid))
+            os.makedirs(self.scratch_folder)
+
         # The current chain is always saved here
-        self.chain_file = output_folder + "/chain.ovf"
+        self.chain_file = self.scratch_folder + "/chain.ovf"
+
+        # After a run, we copy the chain to this file
+        self.chain_file_post_run = self.output_folder + "/chain.ovf"
 
         # If an initial chain is specified we copy it to the output folder
         if(initial_chain_file):
@@ -156,10 +170,15 @@ class GNEB_Node(NodeMixin):
             log_file = new_output_folder + "/workflow_log.txt"
 
         self.output_folder          = new_output_folder
-        self.chain_file             = self.output_folder + "/chain.ovf"
+
+        # Only change chain file, if it was previously in the output folder
+        if self.chain_file == self.chain_file_post_run:
+            self.chain_file = self.output_folder + "/chain.ovf"
+        self.chain_file_post_run    = self.output_folder + "/chain.ovf"
+
         self.gneb_workflow_log_file = log_file
         if os.path.exists(self.initial_chain_file):
-            self.initial_chain_file     = self.output_folder + "/root_initial_chain.ovf"
+            self.initial_chain_file  = self.output_folder + "/root_initial_chain.ovf"
 
         self.log("Changed output folder to {}".format(new_output_folder))
 
@@ -218,7 +237,9 @@ class GNEB_Node(NodeMixin):
 
         node_dict = dict(
             name                     = str(self.name),
+            uuid                     = str(self.uuid),
             chain_file               = str(self.chain_file),
+            chain_file_post_run      = str(self.chain_file_post_run),
             initial_chain_file       = str(self.initial_chain_file),
             input_file               = str(self.input_file),
             gneb_workflow_log_file   = str(self.gneb_workflow_log_file),
@@ -229,6 +250,7 @@ class GNEB_Node(NodeMixin):
             convergence              = float(self.convergence),
             max_total_iterations     = int(self.max_total_iterations),
             output_folder            = str(self.output_folder),
+            scratch_folder           = str(self.scratch_folder),
             output_tag               = str(self.output_tag),
             child_indices            = [(int(c1), int(c2)) for c1, c2 in self.child_indices],
             allow_split              = bool(self.allow_split),
@@ -357,7 +379,8 @@ class GNEB_Node(NodeMixin):
             child_name          = self.name + "_{}".format(len(self.children))
             child_input_file    = self.input_file
             child_output_folder = self.output_folder + "/{}".format(len(self.children))
-            self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, gneb_workflow_log_file=self.gneb_workflow_log_file, parent = self), )
+
+            self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, scratch_folder = self.scratch_folder, gneb_workflow_log_file = self.gneb_workflow_log_file, parent = self), )
             self.children[-1].current_energy_path = self.current_energy_path.split(i1, i2+1)
             # Copy the other attributes
             self.children[-1].target_noi             = self.target_noi
@@ -619,6 +642,11 @@ class GNEB_Node(NodeMixin):
                     self.exit_callback(self, p_state)
 
                 # p_state gets deleted here, it does not have to persist to run the child nodes
+
+            if self.chain_file != self.chain_file_post_run:
+                self.log("Copying chain_file {} to {}".format(self.chain_file, self.chain_file_post_run))
+                shutil.copyfile(self.chain_file, self.chain_file_post_run)
+
             self.run_children()
             self.log("Finished!")
 
