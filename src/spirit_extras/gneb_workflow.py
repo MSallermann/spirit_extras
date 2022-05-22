@@ -31,12 +31,12 @@ class GNEB_Node(NodeMixin):
         self.total_iterations    = 0
         self.target_noi  = 10
         self.noi         = -1
-        self.convergence = 1e-4
+        self.convergence = 1e-7
         self.path_shortening_constant = -1
         self.max_total_iterations     = -1
         self.output_folder = ""
         self.output_tag    = ""
-        self.allow_split = True
+        self.allow_split   = False
         self.moving_endpoints       = None
         self.translating_endpoints  = None
         self.delta_Rx_left          = 1.0
@@ -53,11 +53,11 @@ class GNEB_Node(NodeMixin):
         self.solver_llg  = simulation.SOLVER_LBFGS_OSO
         self.solver_gneb = simulation.SOLVER_VP_OSO
         self.chain_write_fileformat = io.FILEFORMAT_OVF_BIN
-
-        # private fields
-        self._ci                 = False
-        self._converged          = False
-        self._log                = True # flag to disable/enable logging
+        self.input_file = input_file
+        self.name       = name
+        self.parent     = parent
+        self._log       = True # flag to disable/enable logging
+        self._converged = False
 
         # Create output folder
         if not os.path.exists(output_folder):
@@ -73,10 +73,6 @@ class GNEB_Node(NodeMixin):
                 raise Exception("Initial chain file ({}) does not exist!".format(initial_chain_file))
             self.initial_chain_file = initial_chain_file
             shutil.copyfile(initial_chain_file, self.chain_file)
-
-        self.input_file = input_file
-        self.name       = name
-        self.parent     = parent
 
         # If no log file has been specified we put one in the output folder
         if not gneb_workflow_log_file:
@@ -696,89 +692,3 @@ class GNEB_Node(NodeMixin):
 
             self.update_energy_path(p_state)
             self.save_chain(p_state)
-
-    def clamp_and_refine(self, convergence=None, max_total_iterations=None, idx_max_list=None, apply_ci=True, target_noi=5):
-        """One step of clamp and refine algorithm"""
-
-        if target_noi % 2 == 0:
-            raise Exception("target_noi must be uneven!")
-
-        if not convergence:
-            convergence = self.convergence
-
-        if not max_total_iterations:
-            max_total_iterations = self.max_total_iterations
-
-        try:
-            from spirit import state
-            if(len(self.children) != 0): # If not a leaf node call recursively on children
-                for c in self.children:
-                    c.clamp_and_refine(convergence, max_total_iterations, idx_max_list, apply_ci, target_noi)
-                return
-
-            self.update_energy_path()
-
-            # To get a list of the "interesting" images we compute the second derivative of the energy wrt to Rx
-            # We initialize these lists with a dummy element so the idx counting is not offset by one
-            second_deriv    = [0] # second derivative
-            first_deriv_fw  = [0] # first derivative forward
-            first_deriv_bw  = [0] # first derivative backward
-
-            E  = self.current_energy_path.total_energy
-            Rx = self.current_energy_path.reaction_coordinate
-
-            for idx in range(1, self.current_energy_path.noi()-1): # idx=0 and idx=noi-1 excluded!
-                grad_forward = (E[idx+1] - E[idx]) / (Rx[idx+1] - Rx[idx])
-                grad_backward = (E[idx] - E[idx-1]) / (Rx[idx] - Rx[idx-1])
-                second = 2 * (grad_forward - grad_backward) / ( Rx[idx+1] - Rx[idx-1] )
-                first_deriv_fw.append(grad_forward)
-                first_deriv_bw.append(grad_backward)
-                second_deriv.append(second)
-
-            # If not specified, build the idx_max list
-            if not idx_max_list:
-                idx_max_list = []
-                idx = 1
-                while idx<self.current_energy_path.noi()-1:
-                    if first_deriv_fw[idx]<0 and first_deriv_bw[idx] > 0.01 * first_deriv_fw[idx]:
-                        idx_max_list.append(idx)
-                        idx += 1 # If we add something to idx_max list we increment the idx so that we do not also add the point right after that
-                    idx += 1
-
-            self.log("Clamp and refine! idx_list = {}".format(idx_max_list))
-
-            for idx_max in idx_max_list:
-                if(idx_max == 0 or idx_max == self.noi - 1):
-                    self.log("Cannot clamp and refine, since idx_max (= {}) is either 0 or noi-1".format(idx_max))
-                    return
-
-                with state.State(self.input_file) as p_state:
-                    self._prepare_state(p_state)
-                    self.add_child(idx_max-1, idx_max+1, p_state)
-
-                    # Attributes, that we dont copy
-                    self.children[-1].allow_split          = False  # Dont allow splitting for clamp and refine
-                    self.children[-1].path_shortening_constant = -1 # No path shortening for clamp and refine
-                    self.children[-1].target_noi           = target_noi
-                    self.children[-1].convergence          = convergence
-                    self.children[-1].max_total_iterations = max_total_iterations
-
-                    if apply_ci and not self._ci:
-                        def before_gneb_cb(gnw, p_state):
-                            from spirit import parameters
-                            self.before_gneb_callback(gnw, p_state)
-                            gnw.log("Setting image type")
-                            parameters.gneb.set_climbing_falling(p_state, parameters.gneb.IMAGE_CLIMBING, idx_image=int((target_noi-1)/2))
-                        self.children[-1]._ci = True
-                    else:
-                        def before_gneb_cb(gnw, p_state):
-                            self.before_gneb_callback(gnw, p_state)
-
-                    self.children[-1].before_gneb_callback = before_gneb_cb
-
-            self.run_children()
-
-        except Exception as e:
-            self.log("Exception during 'clamp_and_refine': {}".format(str(e))) # Log the exception and re-raise
-            self.log(traceback.format_exc())
-            raise e
