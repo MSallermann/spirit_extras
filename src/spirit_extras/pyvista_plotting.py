@@ -54,10 +54,11 @@ def isosurface_from_delaunay(delaunay, isovalue=0, scalars_key="spins_z"):
     isosurface = isosurface.smooth()
     return isosurface
 
-def arrows_from_point_cloud(point_cloud, factor=1):
+def arrows_from_point_cloud(point_cloud, factor=1, scale=False, orient="spins", geom=None):
     import pyvista as pv
-    geom   = pv.Cone(radius=0.25, resolution=18)
-    arrows = point_cloud.glyph(orient="spins", scale=False, factor=factor, geom=geom)
+    if geom is None:
+        geom   = pv.Cone(radius=0.25, resolution=18)
+    arrows = point_cloud.glyph(orient=orient, scale=scale, factor=factor, geom=geom)
     return arrows
 
 def create_pre_image(pre_image_spin, point_cloud, angle_tolerance=0.05, n_neighbours=10):
@@ -133,6 +134,19 @@ class Spin_Plotter:
         self.camera_distance = data["distance"]
         self.camera_view_angle = data["view_angle"]
 
+    def rotate_camera(self, axis, angle):
+        from scipy.spatial.transform import Rotation
+        R = Rotation.from_rotvec( angle * np.array(axis )).as_matrix()
+        relative_pos         = self.camera_position    - self.camera_focal_point
+        self.camera_position = np.dot(R, relative_pos) + self.camera_focal_point
+        self.camera_up       = np.dot(R, self.camera_up)
+
+    def align_camera_up(self, axis):
+        from scipy.spatial.transform import Rotation
+        relative_pos    = self.camera_position    - self.camera_focal_point
+        self.camera_up  = axis - relative_pos.dot(axis) / np.linalg.norm(relative_pos)**2 * relative_pos
+        self.camera_up /= np.linalg.norm(self.camera_up)
+
     def set_camera(self, plotter):
         if not self.camera_position is None:
             plotter.camera.position = self.camera_position
@@ -182,12 +196,12 @@ class Spin_Plotter:
 
         return self.add_mesh(isosurface_from_delaunay(self._delaunay, isovalue, scalars_key), render_args)
 
-    def arrows(self, render_args=None):
+    def arrows(self, geom=None, render_args=None):
 
         if render_args is None:
             render_args = self.default_render_args.copy()
 
-        return self.add_mesh(arrows_from_point_cloud(self._point_cloud), render_args)
+        return self.add_mesh(arrows_from_point_cloud(self._point_cloud, geom), render_args)
 
     def add_preimage(self, spin_dir, tol=0.05, n_neighbours=10, interpolation_factor=1, render_args={"color" : "black"}):
         if not self._delaunay:
