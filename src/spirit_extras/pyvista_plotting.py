@@ -201,7 +201,7 @@ class Spin_Plotter:
         if render_args is None:
             render_args = self.default_render_args.copy()
 
-        return self.add_mesh(arrows_from_point_cloud(self._point_cloud, geom), render_args)
+        return self.add_mesh(arrows_from_point_cloud(self._point_cloud, factor=1, scale=False, orient="spins", geom=geom), render_args)
 
     def add_preimage(self, spin_dir, tol=0.05, n_neighbours=10, interpolation_factor=1, render_args={"color" : "black"}):
         if not self._delaunay:
