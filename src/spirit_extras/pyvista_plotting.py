@@ -252,8 +252,14 @@ class Spin_Plotter:
                 print(f"Could not add_mesh {m}")
                 print(e)
 
-        if not self.background_color is None:
-            plotter.set_background(self.background_color)
-
         plotter.add_axes(color="black", line_width=6)
-        plotter.show(screenshot= png_path + ".png")
+
+        transparent_background = False
+        if not self.background_color is None:
+            if self.background_color.lower() == "transparent":
+                transparent_background = True
+            else:
+                plotter.set_background(self.background_color)
+
+        plotter.screenshot(png_path + ".png", transparent_background=transparent_background)
+        plotter.close()
