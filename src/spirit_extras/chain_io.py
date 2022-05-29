@@ -56,3 +56,25 @@ def chain_append_to_file_from_file(p_state, filename_out, filename_in):
     # TODO: io.chain_append seems to be broken, so we use image_append...
     for i in range(noi_file):
         io.image_append(p_state, filename_out, idx_image=i)
+
+
+def swap_images(p_state, idx1, idx2):
+    """Swaps the place of two images in the chain"""
+    from spirit import chain
+    chain.image_to_clipboard(p_state, idx1) # idx1 to clipboard
+    chain.insert_image_after(p_state, idx2) # insert after 2
+    chain.image_to_clipboard(p_state, idx2) # idx2 to clipboard
+    chain.replace_image(p_state, idx1) # replace idx1 with idx2 from clipboard
+    chain.delete_image(p_state, idx2)
+
+
+def invert_chain(p_state, idx_start=0, idx_end=-1):
+    """Inverts the chain between idx_start and idx_end. 'idx_end' < 0 is equivalent to idx_end=noi-1"""
+    from spirit import chain
+
+    if idx_end<0:
+        idx_end = chain.get_noi(p_state) - 1
+
+    idx_stop_swap = int( idx_start + (idx_end - idx_start - 1) / 2 )
+    for img in range(idx_start, idx_stop_swap+1):
+        swap_images(p_state, img, idx_end - idx_start - img)
