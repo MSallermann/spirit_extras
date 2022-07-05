@@ -25,10 +25,6 @@ def interpolate_point_cloud(spin_system, point_cloud=None, factor=1):
     offset_c = spin_system.positions[0, 0, 0, n_cells[2]-1] / factor
     spin_system.flatten()
 
-    print(offset_a)
-    print(offset_b)
-    print(offset_c)
-
     positions_interpolated = np.empty( shape = (nos_after, 3) )
 
     for a in range(factor):
@@ -39,9 +35,6 @@ def interpolate_point_cloud(spin_system, point_cloud=None, factor=1):
                 idx_1 = (a + factor * (b + factor * c)) * nos
                 positions_interpolated[idx_1 : idx_1 + nos] = spin_system.positions / factor + offset_vector
 
-    print(spin_system.positions)
-    print(positions_interpolated)
-
     return pv.PolyData( positions_interpolated ).interpolate(point_cloud)
 
 def delaunay(point_cloud):
@@ -51,6 +44,8 @@ def isosurface_from_delaunay(delaunay, isovalue=0, scalars_key="spins_z"):
     import pyvista as pv
     # Create the contour
     isosurface = delaunay.contour([isovalue], scalars = scalars_key, progress_bar=True)
+    if isosurface.n_faces < 1:
+        return None
     isosurface = isosurface.smooth()
     return isosurface
 
