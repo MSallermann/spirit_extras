@@ -78,6 +78,7 @@ def save_to_png(image_file_name, mesh_list):
 
 def plot_color_sphere(image_file_name, spin_to_rgba_func):
     import pyvista as pv
+    import vtk
 
     sphere = pv.Sphere(radius=1.0, start_theta=180, end_theta = 90, phi_resolution=60, theta_resolution=60)
 
@@ -85,14 +86,42 @@ def plot_color_sphere(image_file_name, spin_to_rgba_func):
 
     pv.start_xvfb()
     plotter = pv.Plotter( off_screen=True, shape=(1,1), lighting=None)
-    light = pv.Light(light_type='headlight')
-    # these don't do anything for a headlight:
-    light.position = (1, 2, 3)
-    light.focal_point = (4, 5, 6)
-    plotter.add_light(light)
-    plotter.add_mesh(sphere, scalars="spins_rgba", specular=0.7, ambient=0.4, specular_power=5, rgb=True, smooth_shading=True)
+    plotter.window_size = 724*4, 724*4
+
+    pv.global_theme.font.family = 'times'
+    pv.global_theme.font.size   = 48
+
+    plotter.add_mesh(sphere, scalars="spins_rgba", pbr=True, roughness=0.3, specular=0.2, ambient=0.1, specular_power=2, rgb=True, smooth_shading=True)
+
+    directions = [ [1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]]
+    for d in directions:
+        arrow = pv.Arrow(direction = d)
+        plotter.add_mesh(arrow, color=spin_to_rgba_func([d])[0], specular=0.0, ambient=0.1, specular_power=2, rgb=True, smooth_shading=True)
+
+    normals = [ [1,0,0], [0,1,0], [0,0,1]]
+    for n in normals:
+        disc = pv.Disc(inner=2, outer = 2.5, normal=n, c_res=48)
+        disc["spins_rgba"] = spin_to_rgba_func( [p/np.linalg.norm(p) for p in disc.points] )
+        plotter.add_mesh(disc, scalars="spins_rgba", show_edges=True)
+    
+    labels = ["x", "y", "z"]
+    points = [[1.0,0,0], [0,1,0], [0,0,1]]
+
+    for l,p in zip(labels, points):
+        txt = pv.Text3D(l, depth=0.005 ).rotate_x(90).rotate_z(-45-180).scale(0.53)
+        txt = txt.translate( 1.22 * np.array(p) - txt.center )
+
+        txt2 = pv.Text3D(l, depth=0.01 ).rotate_x(90).rotate_z(-45-180).scale(0.5)
+        txt2 = txt2.translate( 1.22 * np.array(p) - txt2.center)
+
+        plotter.add_mesh(txt, color="black")
+        plotter.add_mesh(txt2, color="white")
+
     plotter.set_background("white")
-    plotter.show(screenshot=image_file_name + ".png")
+    # plotter.add_axes(color="black", line_width=6)
+    plotter.camera.zoom(1.7)
+
+    plotter.screenshot(image_file_name + ".png", transparent_background=True)
 
 import pyvista as pv
 class Spin_Plotter:
