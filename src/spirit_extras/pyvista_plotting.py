@@ -110,8 +110,10 @@ class Spin_Plotter:
         self._delaunay    = None
 
         self.background_color = "white"
+        self.axes             = False
 
-        self.meshlist = []
+        self.meshlist   = []
+        self.resolution = (1980, 1080)
 
         self.camera_position    = None
         self.camera_up          = None
@@ -141,9 +143,28 @@ class Spin_Plotter:
         self.camera_position = np.dot(R, relative_pos) + self.camera_focal_point
         self.camera_up       = np.dot(R, self.camera_up)
 
+    def align_camera_position(self, axis, align_direction, distance=None):
+        if distance is None:
+            distance = np.linalg.norm(self.camera_focal_point - self.camera_position)
+
+        # Remove component along axis from align direction and from current relative position
+        align_direction = np.array(align_direction)
+        align_direction = align_direction - np.dot(align_direction,axis) * axis
+        align_direction /= np.linalg.norm(align_direction)
+
+        current_relative_pos = self.camera_position - self.camera_focal_point
+        current_relative_pos /= np.linalg.norm(current_relative_pos)
+
+        # Comp along axis
+        axis_component = np.dot(current_relative_pos, axis) * axis
+
+        relative_pos = align_direction + axis_component
+        relative_pos /= np.linalg.norm(relative_pos)
+        self.camera_position = self.camera_focal_point + relative_pos * distance
+
     def align_camera_up(self, axis):
         from scipy.spatial.transform import Rotation
-        relative_pos    = self.camera_position    - self.camera_focal_point
+        relative_pos    = self.camera_position  - self.camera_focal_point
         self.camera_up  = axis - relative_pos.dot(axis) / np.linalg.norm(relative_pos)**2 * relative_pos
         self.camera_up /= np.linalg.norm(self.camera_up)
 
@@ -193,8 +214,12 @@ class Spin_Plotter:
 
         if render_args is None:
             render_args = self.default_render_args.copy()
+        iso = isosurface_from_delaunay(self._delaunay, isovalue, scalars_key)
 
-        return self.add_mesh(isosurface_from_delaunay(self._delaunay, isovalue, scalars_key), render_args)
+        if iso is None:
+            return None, {}
+        else:
+            return self.add_mesh(iso, render_args)
 
     def arrows(self, geom=None, render_args=None):
 
@@ -212,8 +237,14 @@ class Spin_Plotter:
 
         return self.add_mesh( create_pre_image(spin_dir, self._point_cloud, angle_tolerance=tol, n_neighbours=n_neighbours), render_args )
 
+    def _axes(self, plotter):
+        colors = get_rgba_colors([[1,0,0],[0,1,0],[0,0,1]])
+        plotter.add_axes(color="black", line_width=6, x_color=colors[0], y_color=colors[1], z_color=colors[2])
+
     def show(self, save_camera_file=None):
         plotter = pv.Plotter(shape=(1,1))
+        plotter.window_size = self.resolution
+
         self.set_camera(plotter)
 
         for m, args in self.meshlist:
@@ -223,10 +254,16 @@ class Spin_Plotter:
                 print(f"Could not add_mesh {m}")
                 print(e)
 
-        if not self.background_color is None:
-            plotter.set_background(self.background_color)
+        if self.axes:
+            self._axes(plotter)
 
-        plotter.add_axes(color="black", line_width=6)
+        transparent_background = False
+        if not self.background_color is None:
+            if self.background_color.lower() == "transparent":
+                transparent_background = True
+            else:
+                plotter.set_background(self.background_color)
+
         plotter.show()
 
         if save_camera_file is not None:
@@ -239,10 +276,12 @@ class Spin_Plotter:
             )
             with open(save_camera_file, "w") as f:
                 f.write(json.dumps(camera_dict, indent=4))
+        plotter.close()
 
     def render_to_png(self, png_path ):
         pv.start_xvfb()
-        plotter = pv.Plotter(off_screen=True, shape=(1,1))
+        plotter = pv.Plotter(off_screen=True, shape=(1,1), multi_samples=8)
+        plotter.window_size = self.resolution
         self.set_camera(plotter)
 
         for m, args in self.meshlist:
@@ -252,7 +291,8 @@ class Spin_Plotter:
                 print(f"Could not add_mesh {m}")
                 print(e)
 
-        plotter.add_axes(color="black", line_width=6)
+        if self.axes:
+            self._axes(plotter)
 
         transparent_background = False
         if not self.background_color is None:
