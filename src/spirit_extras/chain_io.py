@@ -45,17 +45,22 @@ def chain_append_from_file(p_state, filename):
     chain.update_data(p_state)
 
 
-def chain_append_to_file_from_file(p_state, filename_out, filename_in):
+def chain_append_to_file_from_file(p_state, filename_out, filename_in, fileformat=None):
     """Reads the chain from `filename_in` and appends it to `filename_out`"""
     from spirit import io, chain
-    noi_file = io.n_images_in_file(p_state, filename_in)
+
+    if fileformat is None:
+        fileformat = io.FILEFORMAT_OVF_TEXT
+
     chain.image_to_clipboard(p_state)
+
+    noi_file = io.n_images_in_file(p_state, filename_in)
     chain.set_length(p_state, noi_file)
     io.chain_read(p_state, filename_in)
 
     # TODO: io.chain_append seems to be broken, so we use image_append...
     for i in range(noi_file):
-        io.image_append(p_state, filename_out, idx_image=i)
+        io.image_append(p_state, filename_out, idx_image=i, fileformat=fileformat)
 
 
 def swap_images(p_state, idx1, idx2):
