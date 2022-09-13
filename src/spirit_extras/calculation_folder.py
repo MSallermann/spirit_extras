@@ -10,9 +10,9 @@ class Calculation_Folder:
 
         self._lock_file = os.path.join(self.output_folder, "~lock")
 
-        if not os.path.exists(self.output_folder):
+        if not os.path.isdir(self.output_folder):
             if not create:
-                raise Exception("Folder {} does not exist. Call with 'create=True' to create it.".format(self.output_folder))
+                raise Exception("Directory {} either does not exist or is a file that is not a directory. Call with 'create=True' to create it.".format(self.output_folder))
             else:
                 os.makedirs(self.output_folder)
 
