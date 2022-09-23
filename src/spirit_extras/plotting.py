@@ -165,68 +165,6 @@ class Paper_Plot:
 
         ax.annotate(text, xy, xy_text * offset_scale, arrowprops = arrowprops, verticalalignment="center", horizontalalignment="center", textcoords="offset points")
 
-if __name__ == "__main__":
-
-    def render_from_annotations(annotation_list, xlist, output_directory):
-        if not os.path.exists(output_directory):
-            os.makedirs(output_directory)
-
-        for xy, text in annotation_list:
-            idx = np.argmin( np.abs(xlist - xy[0]) )
-            if os.path.exists(os.path.join(output_directory, f"idx_{idx}.png")):
-                print("Skipping idx {idx}")
-                continue
-            print(f"Rendering idx {idx}")
-            ## Implement rendering here
-
-    pplot = Paper_Plot(11 * Paper_Plot.cm)
-    pplot.nrows = 4
-    pplot.ncols = 5
-    pplot.horizontal_margins[0] = 0.15
-    pplot.vertical_margins[0]   = 0.125
-
-    pplot.height_from_aspect_ratio(5/4)
-
-    fig = pplot.fig()
-    gs  = pplot.gs()
-
-    # Main plot
-    ax_plot = fig.add_subplot(gs[1:,:-1])
-    ax_plot.spines["top"].set_color("lightgrey")
-    ax_plot.spines["right"].set_color("lightgrey")
-    ax_plot.set_ylabel("y_label")
-    ax_plot.set_xlabel("x_label")
-
-    x = np.linspace(0,5)
-    y = np.sin(x)
-    ax_plot.plot(x, y)
-
-    for i in range(0, 40, 5):
-        pplot.annotate_graph(ax_plot, (x[i], y[i]), "d")
-
-    annotation_list = pplot.annotation_dict["key1"]["annotation_list"]
-
-    render_from_annotations(annotation_list, x, "template_renderings")
-
-    counter = 0
-    for a in pplot.row(0):
-        pplot.image_to_ax(a, "sample.png")
-        a.spines["left"].set_visible(True)
-        a.spines["left"].set_color("lightgrey")
-        pplot.annotate(a, annotation_list[counter][1] )
-        counter += 1
-
-    for a in pplot.col(-1, slice(1,None,1)):
-        pplot.image_to_ax(a, "sample.png")
-        a.spines["top"].set_visible(True)
-        a.spines["top"].set_color("lightgrey")
-        pplot.annotate(a, annotation_list[counter][1] )
-        counter += 1
-
-    pplot.spine_axis(gs[:,:])
-
-    fig.savefig("myfig.png", dpi=300)
-
 def colorbar(mappable, *args, **kwargs):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     import matplotlib.pyplot as plt
