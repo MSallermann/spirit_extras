@@ -85,8 +85,20 @@ class Paper_Plot:
     def annotate(self, ax, text, pos = [0,0.98], fontsize=8):
         ax.text(*pos, text, fontsize=fontsize, horizontalalignment='left', verticalalignment='top', transform=ax.transAxes)
 
-    def image_to_ax(self, ax, path):
-        image = plt.imread(path)
+    def crop(self, image, width, height=None):
+        if height is None:
+            height = width
+        o             = [int(image.shape[0]/2), int(image.shape[1]/2)]
+        lower_height  = o[0] - int(height/2)
+        lower_width   = o[1] - int(width/2)
+        upper_width = lower_width + width
+        upper_height = lower_height + height
+        return image[lower_height:upper_height, lower_width:upper_width, :]
+
+    def image_to_ax(self, ax, image):
+        import os
+        if os.path.exists(image):
+            image = plt.imread(image)
         ax.imshow(image)
         ax.tick_params(axis='both', which='both', bottom=0, left=0, labelbottom=0, labelleft=0)
         ax.set_facecolor([0,0,0,0])
