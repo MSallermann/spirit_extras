@@ -375,15 +375,16 @@ class GNEB_Node(NodeMixin):
         io.chain_write(p_state, self.chain_file, fileformat=self.chain_write_fileformat)
 
     def backup_chain(self, path, p_state=None):
+        from spirit import state, io
+
         """Saves the chain to a file"""
         if not p_state is None:
             self.log("Writing chain to {}".format(path))
             io.chain_write(p_state, path, fileformat=self.chain_write_fileformat)
         else:
-            from spirit import state, io
             with state.State(self.input_file) as p_state:
                 self._prepare_state(p_state)
-                self.backup_chain(path)
+                self.backup_chain(path, p_state)
 
     def add_child(self, i1, i2, p_state=None):
 
@@ -447,7 +448,9 @@ class GNEB_Node(NodeMixin):
         from spirit import state, chain, simulation
         if not p_state is None:
             self.log("Relaxing intermediate minima")
+
             for idx_minimum in self.intermediate_minima:
+                self.log(f"Relaxing {idx_minimum}")
                 simulation.start(p_state, simulation.METHOD_LLG, self.solver_llg, idx_image = idx_minimum)
             chain.update_data(p_state)
             self.update_energy_path(p_state)
@@ -458,6 +461,7 @@ class GNEB_Node(NodeMixin):
                 self._log = False
                 self._prepare_state(p_state)
                 chain.update_data(p_state)
+                self.update_energy_path(p_state)
                 self.check_for_minima()
                 self._log = True
                 self.relax_intermediate_minima(p_state)
