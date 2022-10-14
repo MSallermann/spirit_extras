@@ -87,7 +87,8 @@ class Paper_Plot:
 
     def crop(self, image, width, height=None):
         if height is None:
-            height = width
+            height = image.shape[1]
+
         o             = [int(image.shape[0]/2), int(image.shape[1]/2)]
         lower_height  = o[0] - int(height/2)
         lower_width   = o[1] - int(width/2)
