@@ -3,9 +3,9 @@ import json, os
 class Calculation_Folder:
     """Represents one folder of a calculation."""
 
-    def __init__(self, output_folder, create=False):
+    def __init__(self, output_folder, create=False, descriptor_file = "descriptor.json"):
         self.output_folder            = output_folder
-        self._descriptor_file_name    = "descriptor.json"
+        self._descriptor_file_name    = descriptor_file
         self.descriptor = {}
 
         self._lock_file = os.path.join(self.output_folder, "~lock")
