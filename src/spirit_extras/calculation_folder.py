@@ -94,5 +94,21 @@ class Calculation_Folder:
         return os.path.relpath(absolute_path, self.output_folder)
 
     def to_json(self):
-        with open(self.get_descriptor_file_path(), "w") as f:
-            f.write(json.dumps(self.descriptor, indent=4))
+        descriptor_file = self.to_abspath( self._descriptor_file_name )
+        file, ext = os.path.splitext(self._descriptor_file_name)
+
+        # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
+        temporary_file = self.to_abspath( file + "__temp__" + ext )
+        try:
+            with open(temporary_file, "w") as f:
+                f.write(json.dumps(self.descriptor, indent=4))
+                # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
+                os.remove( descriptor_file )
+                os.rename( temporary_file, descriptor_file )
+        except Exception as e:
+            print("JSON serialization has encountered an error.")
+            print(f"The original file '{descriptor_file}' has not been changed.")
+            # We delete the temporary file, if it exists
+            if os.path.exists( temporary_file ):
+                os.remove( temporary_file )
+            raise e
