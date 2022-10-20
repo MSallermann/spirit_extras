@@ -103,7 +103,8 @@ class Calculation_Folder:
             with open(temporary_file, "w") as f:
                 f.write(json.dumps(self.descriptor, indent=4))
                 # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
-                os.remove( descriptor_file )
+                if os.path.exists( descriptor_file ):
+                    os.remove( descriptor_file )
                 os.rename( temporary_file, descriptor_file )
         except Exception as e:
             print("JSON serialization has encountered an error.")
