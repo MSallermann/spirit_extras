@@ -59,7 +59,7 @@ class Calculation_Folder:
     def _replace_from_dict(self, string, dict):
         import re
 
-        pattern_str = "\{[a-zA-Z0-9]+(?::[^\}^:]*)?\}"
+        pattern_str = "\{[a-zA-Z0-9_]+(?::[^\}^:]*)?\}"
         pattern = re.compile(pattern_str)
         m = pattern.findall(string)
 
