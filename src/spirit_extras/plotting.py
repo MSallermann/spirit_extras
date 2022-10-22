@@ -273,6 +273,49 @@ def plot_energy_path(energy_path, ax, normalize_reaction_coordinate = False, kwa
     ax.set_xlabel( "reaction coordinate [arb. units]" )
     ax.set_ylabel( r"$\Delta E$ [meV]" )
 
+
+def gradient_line(ax, x, y, c, lw=2.0, cmap="viridis", c_norm = None, n_inter=10):
+    """ Plots a line with a color gradient
+        Usage example:
+            x = np.linspace(0, 1, 30)
+            y = np.sin(x*5)
+            c = np.cos(x)
+            gradient_line(ax = plt.gca(), x=x, y=y, c=c)
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    from matplotlib.colors import Normalize
+
+    try:
+        x_dense = np.unique( [np.linspace(x[i], x[i+1], n_inter) for i in range(len(x)-1)] )
+        y_dense = np.interp(x_dense, x, y)
+        c_dense = np.interp(x_dense, x, c)
+
+        segments = np.zeros( shape = (len(x_dense)-1,4) )
+
+        segments[:,0] = x_dense[:-1]
+        segments[:,1] = y_dense[:-1]
+        segments[:,2] = x_dense[1:]
+        segments[:,3] = y_dense[1:]
+
+        if c_norm is None:
+            norm = plt.Normalize(c_dense.min(), c_dense.max())
+        else:
+            norm = plt.Normalize(*c_norm)
+
+        segments = segments.reshape( len(x_dense)-1, 2, 2  )
+
+        lc = LineCollection(segments, cmap=cmap, norm=norm )
+
+        lc.set_array(c_dense)
+        lc.set_linewidth(lw)
+
+        ax.add_collection(lc)
+        # ax.autoscale()
+    except:
+        pass
+
+
 def get_rgba_colors(spins, opacity=1.0, cardinal_a=np.array([1,0,0]), cardinal_b=np.array([0,1,0]), cardinal_c=np.array([0,0,1])):
     """Returns a colormap in the matplotlib format (an Nx4 array)"""
     import math
