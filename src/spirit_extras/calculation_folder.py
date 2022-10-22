@@ -59,13 +59,12 @@ class Calculation_Folder:
     def _replace_from_dict(self, string, dict):
         import re
 
-        pattern_str = "\{[a-zA-Z0-9_]+(?::[^\}^:]*)?\}"
+        pattern_str = "\{[a-zA-Z0-9_#.]+(?::[^\}^:]*)?\}"
         pattern = re.compile(pattern_str)
         m = pattern.findall(string)
 
         for temp in m:
             split_match = temp[1:-1].split(':')
-            key_match = split_match[0]
 
             if len(split_match) == 2: ## if len(2) we have a format string to deal with
                 format_string = split_match[1]
