@@ -1,18 +1,23 @@
 import json, os
 
+
 class Calculation_Folder:
     """Represents one folder of a calculation."""
 
-    def __init__(self, output_folder, create=False, descriptor_file = "descriptor.json"):
-        self.output_folder            = output_folder
-        self._descriptor_file_name    = descriptor_file
+    def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
+        self.output_folder = output_folder
+        self._descriptor_file_name = descriptor_file
         self.descriptor = {}
 
         self._lock_file = os.path.join(self.output_folder, "~lock")
 
         if not os.path.isdir(self.output_folder):
             if not create:
-                raise Exception("Directory {} either does not exist or is a file that is not a directory. Call with 'create=True' to create it.".format(self.output_folder))
+                raise Exception(
+                    "Directory {} either does not exist or is a file that is not a directory. Call with 'create=True' to create it.".format(
+                        self.output_folder
+                    )
+                )
             else:
                 os.makedirs(self.output_folder)
 
@@ -64,10 +69,10 @@ class Calculation_Folder:
         m = pattern.findall(string)
 
         for temp in m:
-            split_match = temp[1:-1].split(':')
+            split_match = temp[1:-1].split(":")
             key_match = split_match[0]
 
-            if len(split_match) == 2: ## if len(2) we have a format string to deal with
+            if len(split_match) == 2:  ## if len(2) we have a format string to deal with
                 format_string = split_match[1]
                 literal = "{0:" + format_string + "}"
             else:
@@ -75,7 +80,7 @@ class Calculation_Folder:
 
             key = split_match[0]
             replace = literal.format(dict[key])
-            string = string.replace( temp, replace)
+            string = string.replace(temp, replace)
 
         return string
 
@@ -94,22 +99,22 @@ class Calculation_Folder:
         return os.path.relpath(absolute_path, self.output_folder)
 
     def to_json(self):
-        descriptor_file = self.to_abspath( self._descriptor_file_name )
+        descriptor_file = self.to_abspath(self._descriptor_file_name)
         file, ext = os.path.splitext(self._descriptor_file_name)
 
         # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
-        temporary_file = self.to_abspath( file + "__temp__" + ext )
+        temporary_file = self.to_abspath(file + "__temp__" + ext)
         try:
             with open(temporary_file, "w") as f:
                 f.write(json.dumps(self.descriptor, indent=4))
                 # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
-                if os.path.exists( descriptor_file ):
-                    os.remove( descriptor_file )
-                os.rename( temporary_file, descriptor_file )
+                if os.path.exists(descriptor_file):
+                    os.remove(descriptor_file)
+                os.rename(temporary_file, descriptor_file)
         except Exception as e:
             print("JSON serialization has encountered an error.")
             print(f"The original file '{descriptor_file}' has not been changed.")
             # We delete the temporary file, if it exists
-            if os.path.exists( temporary_file ):
-                os.remove( temporary_file )
+            if os.path.exists(temporary_file):
+                os.remove(temporary_file)
             raise e

@@ -15,53 +15,64 @@ from datetime import datetime
 import uuid
 import json
 
+
 class GNEB_Node(NodeMixin):
     """A class that represents a GNEB calculation on a single chain. Can spawn children if cutting of the chain becomes necessary."""
 
-    def __init__(self, name, input_file, output_folder, initial_chain_file=None, gneb_workflow_log_file=None, parent=None, children=None, scratch_folder=None):
+    def __init__(
+        self,
+        name,
+        input_file,
+        output_folder,
+        initial_chain_file=None,
+        gneb_workflow_log_file=None,
+        parent=None,
+        children=None,
+        scratch_folder=None,
+    ):
         from spirit import simulation, io
 
         """Constructor."""
-        self.chain_file : str             = ""
-        self.chain_file_post_run : str    = ""
-        self.initial_chain_file : str     = ""
-        self.input_file : str             = ""
-        self.gneb_workflow_log_file : str = ""
-        self.uuid                = uuid.uuid1()
+        self.chain_file: str = ""
+        self.chain_file_post_run: str = ""
+        self.initial_chain_file: str = ""
+        self.input_file: str = ""
+        self.gneb_workflow_log_file: str = ""
+        self.uuid = uuid.uuid1()
         self.current_energy_path = object()
-        self.n_iterations_check  = 5000
-        self.n_checks_save       = 3
-        self.total_iterations    = 0
-        self.target_noi  = -1
-        self.noi         = -1
+        self.n_iterations_check = 5000
+        self.n_checks_save = 3
+        self.total_iterations = 0
+        self.target_noi = -1
+        self.noi = -1
         self.convergence = 1e-7
         self.path_shortening_constant = -1
-        self.max_total_iterations     = -1
+        self.max_total_iterations = -1
         self.output_folder = ""
-        self.output_tag    = ""
-        self.allow_split   = False
-        self.max_depth     = 1
-        self.moving_endpoints       = None
-        self.translating_endpoints  = None
-        self.delta_Rx_left          = 1.0
-        self.delta_Rx_right         = 1.0
+        self.output_tag = ""
+        self.allow_split = False
+        self.max_depth = 1
+        self.moving_endpoints = None
+        self.translating_endpoints = None
+        self.delta_Rx_left = 1.0
+        self.delta_Rx_right = 1.0
         self.state_prepare_callback = None
-        self.gneb_step_callback     = None
-        self.exit_callback          = None
-        self.before_gneb_callback   = None
-        self.before_llg_callback    = None
-        self.after_llg_callback     = None
+        self.gneb_step_callback = None
+        self.exit_callback = None
+        self.before_gneb_callback = None
+        self.before_llg_callback = None
+        self.after_llg_callback = None
         self.intermediate_minima = []
-        self.child_indices       = []
-        self.image_types         = []
-        self.history             = []
-        self.solver_llg  = simulation.SOLVER_LBFGS_OSO
+        self.child_indices = []
+        self.image_types = []
+        self.history = []
+        self.solver_llg = simulation.SOLVER_LBFGS_OSO
         self.solver_gneb = simulation.SOLVER_VP_OSO
         self.chain_write_fileformat = io.FILEFORMAT_OVF_BIN
         self.input_file = input_file
-        self.name       = name
-        self.parent     = parent
-        self._log       = True # flag to disable/enable logging
+        self.name = name
+        self.parent = parent
+        self._log = True  # flag to disable/enable logging
         self._converged = False
 
         # Create output folder
@@ -74,7 +85,9 @@ class GNEB_Node(NodeMixin):
         if scratch_folder is None:
             self.scratch_folder = self.output_folder
         else:
-            self.scratch_folder = os.path.join(scratch_folder, self.name + "#" + str(self.uuid))
+            self.scratch_folder = os.path.join(
+                scratch_folder, self.name + "#" + str(self.uuid)
+            )
             os.makedirs(self.scratch_folder)
 
         # The current chain is always saved here
@@ -84,9 +97,11 @@ class GNEB_Node(NodeMixin):
         self.chain_file_post_run = self.output_folder + "/chain.ovf"
 
         # If an initial chain is specified we copy it to the output folder
-        if(initial_chain_file):
+        if initial_chain_file:
             if not os.path.exists(initial_chain_file):
-                raise Exception("Initial chain file ({}) does not exist!".format(initial_chain_file))
+                raise Exception(
+                    "Initial chain file ({}) does not exist!".format(initial_chain_file)
+                )
             self.initial_chain_file = initial_chain_file
             shutil.copyfile(initial_chain_file, self.chain_file)
 
@@ -101,15 +116,15 @@ class GNEB_Node(NodeMixin):
 
         # Log the node creation
         creation_msg = "Creating new GNEB_Node '{}'".format(name)
-        if(parent):
+        if parent:
             creation_msg += ", parent '{}'".format(parent.name)
-        if(children):
+        if children:
             creation_msg += ", children: "
             for c in children:
                 creation_msg += "{} ".format(c.name)
         self.log(creation_msg)
 
-        if(initial_chain_file):
+        if initial_chain_file:
             self.log("Initial chain file: {}".format(initial_chain_file))
 
     def setup_plot_callbacks(self):
@@ -122,52 +137,78 @@ class GNEB_Node(NodeMixin):
         def mark_climbing_image(p_state, gnw, ax):
             """Helper function that marks the climbing image in a plot."""
             import numpy as np
-            image_types =  np.array([gneb.get_climbing_falling(p_state, i) for i in range(chain.get_noi(p_state))])
-            idx_climbing_list = np.array(range(chain.get_noi(p_state)))[image_types == gneb.IMAGE_CLIMBING]
-            if(len(idx_climbing_list) == 0):
+
+            image_types = np.array(
+                [
+                    gneb.get_climbing_falling(p_state, i)
+                    for i in range(chain.get_noi(p_state))
+                ]
+            )
+            idx_climbing_list = np.array(range(chain.get_noi(p_state)))[
+                image_types == gneb.IMAGE_CLIMBING
+            ]
+            if len(idx_climbing_list) == 0:
                 return
             idx_climbing = idx_climbing_list[0]
             E0 = gnw.current_energy_path.total_energy[-1]
-            ax.plot( gnw.current_energy_path.reaction_coordinate[idx_climbing], gnw.current_energy_path.total_energy[idx_climbing] - E0, marker="^", color="red" )
+            ax.plot(
+                gnw.current_energy_path.reaction_coordinate[idx_climbing],
+                gnw.current_energy_path.total_energy[idx_climbing] - E0,
+                marker="^",
+                color="red",
+            )
 
         def before_gneb_cb(gnw, p_state):
             # gneb.set_image_type_automatically(p_state)
-            simulation.start(p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=1)
+            simulation.start(
+                p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=1
+            )
             gnw.current_energy_path = data.energy_path_from_p_state(p_state)
             plotting.plot_energy_path(gnw.current_energy_path, plt.gca())
             mark_climbing_image(p_state, gnw, plt.gca())
-            plt.savefig(gnw.output_folder + "/path_{}_initial.png".format(gnw.total_iterations))
+            plt.savefig(
+                gnw.output_folder + "/path_{}_initial.png".format(gnw.total_iterations)
+            )
             plt.close()
+
         self.before_gneb_callback = before_gneb_cb
 
         def step_cb(gnw, p_state):
             import numpy as np
+
             gnw.update_energy_path(p_state)
             plotting.plot_energy_path(gnw.current_energy_path, plt.gca())
             mark_climbing_image(p_state, gnw, plt.gca())
             plt.savefig(gnw.output_folder + "/path_{}.png".format(gnw.total_iterations))
             plt.close()
 
-            plt.plot( np.asarray(gnw.history)[:,0], np.asarray(gnw.history)[:,1] )
+            plt.plot(np.asarray(gnw.history)[:, 0], np.asarray(gnw.history)[:, 1])
             plt.xlabel("Total iterations")
             plt.ylabel("Max. torque [meV]")
             plt.yscale("log")
             plt.savefig(gnw.output_folder + "/convergence.png")
             plt.close()
+
         self.gneb_step_callback = step_cb
 
         def after_llg_cb(gnw, p_state):
             plotting.plot_energy_path(gnw.current_energy_path, plt.gca())
             mark_climbing_image(p_state, gnw, plt.gca())
-            plt.savefig(gnw.output_folder + "/path_after_llg.png".format(gnw.total_iterations))
+            plt.savefig(
+                gnw.output_folder + "/path_after_llg.png".format(gnw.total_iterations)
+            )
             plt.close()
+
         self.after_llg_callback = after_llg_cb
 
         def exit_cb(gnw, p_state):
             plotting.plot_energy_path(gnw.current_energy_path, plt.gca())
             mark_climbing_image(p_state, gnw, plt.gca())
-            plt.savefig(gnw.output_folder + "/path_{}_final.png".format(gnw.total_iterations))
+            plt.savefig(
+                gnw.output_folder + "/path_{}_final.png".format(gnw.total_iterations)
+            )
             plt.close()
+
         self.exit_callback = exit_cb
 
     def change_output_folder(self, new_output_folder, log_file=None):
@@ -175,10 +216,12 @@ class GNEB_Node(NodeMixin):
             raise Exception("Cannot change to new_output_folder, that already exists!")
 
         if self.parent == None:
-            shutil.copytree(self.output_folder, new_output_folder) # Take care of all files we might need
+            shutil.copytree(
+                self.output_folder, new_output_folder
+            )  # Take care of all files we might need
             log_file = new_output_folder + "/workflow_log.txt"
 
-        self.output_folder          = new_output_folder
+        self.output_folder = new_output_folder
 
         # Only change chain file, if it was previously in the output folder
         if self.chain_file == self.chain_file_post_run:
@@ -187,16 +230,17 @@ class GNEB_Node(NodeMixin):
 
         self.gneb_workflow_log_file = log_file
         if os.path.exists(self.initial_chain_file):
-            self.initial_chain_file  = self.output_folder + "/root_initial_chain.ovf"
+            self.initial_chain_file = self.output_folder + "/root_initial_chain.ovf"
 
         self.log("Changed output folder to {}".format(new_output_folder))
 
-        for i,c in enumerate(self.children):
+        for i, c in enumerate(self.children):
             child_output_folder = self.output_folder + "/{}".format(i)
             c.change_output_folder(child_output_folder, log_file)
 
     def collect_chain(self, output_file):
         from spirit import state, io, chain
+
         self.log("Collecting chain in file {}".format(output_file))
 
         if os.path.exists(output_file):
@@ -216,7 +260,7 @@ class GNEB_Node(NodeMixin):
                 # First we check if this images is within any of the ranges covered by the children
                 is_child = False
                 for idx_c, (i1, i2) in enumerate(node.child_indices):
-                    if i>=i1 and i<=i2:
+                    if i >= i1 and i <= i2:
                         is_child = True
                         idx_child = idx_c
                         break
@@ -245,33 +289,33 @@ class GNEB_Node(NodeMixin):
         self.log("Saving to {}".format(json_file))
 
         node_dict = dict(
-            name                     = str(self.name),
-            uuid                     = str(self.uuid),
-            chain_file               = str(self.chain_file),
-            chain_file_post_run      = str(self.chain_file_post_run),
-            initial_chain_file       = str(self.initial_chain_file),
-            input_file               = str(self.input_file),
-            gneb_workflow_log_file   = str(self.gneb_workflow_log_file),
-            n_iterations_check       = int(self.n_iterations_check),
-            n_checks_save            = int(self.n_checks_save),
-            total_iterations         = int(self.total_iterations),
-            target_noi               = int(self.target_noi),
-            convergence              = float(self.convergence),
-            max_total_iterations     = int(self.max_total_iterations),
-            output_folder            = str(self.output_folder),
-            scratch_folder           = str(self.scratch_folder),
-            output_tag               = str(self.output_tag),
-            child_indices            = [(int(c1), int(c2)) for c1, c2 in self.child_indices],
-            allow_split              = bool(self.allow_split),
-            max_depth                = int(self.max_depth),
-            path_shortening_constant = float(self.path_shortening_constant),
-            moving_endpoints         = bool(self.moving_endpoints),
-            delta_Rx_left            = float(self.delta_Rx_left),
-            delta_Rx_right           = float(self.delta_Rx_right),
-            image_types              = [ [int(t[0]), int(t[1]) ] for t in self.image_types],
-            solver_llg               = int(self.solver_llg),
-            solver_gneb              = int(self.solver_gneb),
-            fileformat               = int(self.chain_write_fileformat)
+            name=str(self.name),
+            uuid=str(self.uuid),
+            chain_file=str(self.chain_file),
+            chain_file_post_run=str(self.chain_file_post_run),
+            initial_chain_file=str(self.initial_chain_file),
+            input_file=str(self.input_file),
+            gneb_workflow_log_file=str(self.gneb_workflow_log_file),
+            n_iterations_check=int(self.n_iterations_check),
+            n_checks_save=int(self.n_checks_save),
+            total_iterations=int(self.total_iterations),
+            target_noi=int(self.target_noi),
+            convergence=float(self.convergence),
+            max_total_iterations=int(self.max_total_iterations),
+            output_folder=str(self.output_folder),
+            scratch_folder=str(self.scratch_folder),
+            output_tag=str(self.output_tag),
+            child_indices=[(int(c1), int(c2)) for c1, c2 in self.child_indices],
+            allow_split=bool(self.allow_split),
+            max_depth=int(self.max_depth),
+            path_shortening_constant=float(self.path_shortening_constant),
+            moving_endpoints=bool(self.moving_endpoints),
+            delta_Rx_left=float(self.delta_Rx_left),
+            delta_Rx_right=float(self.delta_Rx_right),
+            image_types=[[int(t[0]), int(t[1])] for t in self.image_types],
+            solver_llg=int(self.solver_llg),
+            solver_gneb=int(self.solver_gneb),
+            fileformat=int(self.chain_write_fileformat),
         )
 
         with open(json_file, "w") as f:
@@ -281,7 +325,7 @@ class GNEB_Node(NodeMixin):
             c.to_json()
 
     def history_to_file(self, path):
-        np.savetxt(path, self.history, header="iteration, max. torque" )
+        np.savetxt(path, self.history, header="iteration, max. torque")
 
     @staticmethod
     def from_json(json_file, parent=None, children=None):
@@ -289,32 +333,50 @@ class GNEB_Node(NodeMixin):
         with open(json_file, "r") as f:
             data = json.load(f)
 
-        name                            = data["name"]
-        input_file                      = data["input_file"]
-        gneb_workflow_log_file          = data["gneb_workflow_log_file"]
-        output_folder                   = data["output_folder"]
+        name = data["name"]
+        input_file = data["input_file"]
+        gneb_workflow_log_file = data["gneb_workflow_log_file"]
+        output_folder = data["output_folder"]
 
-        result                          = GNEB_Node(name, input_file, output_folder, None, gneb_workflow_log_file, parent=parent, children=children)
-        result.n_iterations_check       = data.get("n_iterations_check", result.n_iterations_check)
-        result.n_checks_save            = data.get("n_checks_save", result.n_checks_save)
-        result.total_iterations         = data.get("total_iterations", result.total_iterations)
-        result.target_noi               = data.get("target_noi", result.target_noi)
-        result.convergence              = data.get("convergence", result.convergence)
-        result.max_total_iterations     = data.get("max_total_iterations", result.max_total_iterations)
-        result.chain_file               = data.get("chain_file", result.chain_file)
-        result.initial_chain_file       = data.get("initial_chain_file", result.initial_chain_file)
-        result.output_tag               = data.get("output_tag", result.output_tag)
-        result.allow_split              = data.get("allow_split", result.allow_split)
-        result.max_depth                = data.get("max_depth", result.max_depth)
-        result.child_indices            = data.get("child_indices", result.child_indices)
-        result.moving_endpoints         = data.get("moving_endpoints", result.moving_endpoints)
-        result.image_types              = data.get("image_types", result.image_types)
-        result.delta_Rx_left            = data.get("delta_Rx_left", result.delta_Rx_left)
-        result.delta_Rx_right           = data.get("delta_Rx_right", result.delta_Rx_right)
-        result.path_shortening_constant = data.get("path", result.path_shortening_constant)
-        result.solver_llg               = data.get("solver_llg", result.solver_llg)
-        result.solver_gneb              = data.get("solver_gneb", result.solver_gneb)
-        result.chain_write_fileformat   = data.get("fileformat", result.chain_write_fileformat)
+        result = GNEB_Node(
+            name,
+            input_file,
+            output_folder,
+            None,
+            gneb_workflow_log_file,
+            parent=parent,
+            children=children,
+        )
+        result.n_iterations_check = data.get(
+            "n_iterations_check", result.n_iterations_check
+        )
+        result.n_checks_save = data.get("n_checks_save", result.n_checks_save)
+        result.total_iterations = data.get("total_iterations", result.total_iterations)
+        result.target_noi = data.get("target_noi", result.target_noi)
+        result.convergence = data.get("convergence", result.convergence)
+        result.max_total_iterations = data.get(
+            "max_total_iterations", result.max_total_iterations
+        )
+        result.chain_file = data.get("chain_file", result.chain_file)
+        result.initial_chain_file = data.get(
+            "initial_chain_file", result.initial_chain_file
+        )
+        result.output_tag = data.get("output_tag", result.output_tag)
+        result.allow_split = data.get("allow_split", result.allow_split)
+        result.max_depth = data.get("max_depth", result.max_depth)
+        result.child_indices = data.get("child_indices", result.child_indices)
+        result.moving_endpoints = data.get("moving_endpoints", result.moving_endpoints)
+        result.image_types = data.get("image_types", result.image_types)
+        result.delta_Rx_left = data.get("delta_Rx_left", result.delta_Rx_left)
+        result.delta_Rx_right = data.get("delta_Rx_right", result.delta_Rx_right)
+        result.path_shortening_constant = data.get(
+            "path", result.path_shortening_constant
+        )
+        result.solver_llg = data.get("solver_llg", result.solver_llg)
+        result.solver_gneb = data.get("solver_gneb", result.solver_gneb)
+        result.chain_write_fileformat = data.get(
+            "fileformat", result.chain_write_fileformat
+        )
 
         result.log("Created from json file {}".format(json_file))
 
@@ -348,29 +410,35 @@ class GNEB_Node(NodeMixin):
             self.noi = self.current_energy_path.noi()
         else:
             from spirit import state, chain, simulation
+
             with state.State(self.input_file) as p_state:
                 chain.update_data(p_state)
                 self._prepare_state(p_state)
-                simulation.start(p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=1) # One iteration of GNEB to get interpolated quantities
+                simulation.start(
+                    p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=1
+                )  # One iteration of GNEB to get interpolated quantities
                 self.update_energy_path(p_state)
         self._log = True
 
     def check_for_minima(self):
         """
-           Checks the chain for intermediate minima.
+        Checks the chain for intermediate minima.
         """
         self.intermediate_minima = []
         e = self.current_energy_path.total_energy
-        for i in range(1, len(e) - 1): # Leave out the first and the last energy
-            if(e[i-1] > e[i] and e[i+1] > e[i]):
+        for i in range(1, len(e) - 1):  # Leave out the first and the last energy
+            if e[i - 1] > e[i] and e[i + 1] > e[i]:
                 self.intermediate_minima.append(i)
 
-        if(len(self.intermediate_minima) > 0):
-            self.log("Found intermediate minima at: {}".format(self.intermediate_minima))
+        if len(self.intermediate_minima) > 0:
+            self.log(
+                "Found intermediate minima at: {}".format(self.intermediate_minima)
+            )
 
     def save_chain(self, p_state):
         """Saves the chain and overwrites the chain_file"""
         from spirit import io
+
         self.log("Writing chain to {}".format(self.chain_file))
         io.chain_write(p_state, self.chain_file, fileformat=self.chain_write_fileformat)
 
@@ -387,12 +455,11 @@ class GNEB_Node(NodeMixin):
                 self.backup_chain(path, p_state)
 
     def add_child(self, i1, i2, p_state=None):
-
         def _helper(p_state):
             self.log("Adding child with indices {} and {}".format(i1, i2))
             # Attributes that change due to tree structure
-            child_name          = self.name + "_{}".format(len(self.children))
-            child_input_file    = self.input_file
+            child_name = self.name + "_{}".format(len(self.children))
+            child_input_file = self.input_file
             child_output_folder = self.output_folder + "/{}".format(len(self.children))
 
             if self.scratch_folder == self.output_folder:
@@ -400,58 +467,88 @@ class GNEB_Node(NodeMixin):
             else:
                 child_scratch_folder = self.scratch_folder
 
-            self.children      += (GNEB_Node(name = child_name, input_file = child_input_file, output_folder = child_output_folder, scratch_folder = child_scratch_folder, gneb_workflow_log_file = self.gneb_workflow_log_file, parent = self), )
-            self.children[-1].current_energy_path = self.current_energy_path.split(i1, i2+1)
+            self.children += (
+                GNEB_Node(
+                    name=child_name,
+                    input_file=child_input_file,
+                    output_folder=child_output_folder,
+                    scratch_folder=child_scratch_folder,
+                    gneb_workflow_log_file=self.gneb_workflow_log_file,
+                    parent=self,
+                ),
+            )
+            self.children[-1].current_energy_path = self.current_energy_path.split(
+                i1, i2 + 1
+            )
             # Copy the other attributes
-            self.children[-1].target_noi               = self.target_noi
-            self.children[-1].convergence              = self.convergence
+            self.children[-1].target_noi = self.target_noi
+            self.children[-1].convergence = self.convergence
             self.children[-1].path_shortening_constant = self.path_shortening_constant
-            self.children[-1].max_total_iterations     = self.max_total_iterations
-            self.children[-1].state_prepare_callback   = self.state_prepare_callback
-            self.children[-1].gneb_step_callback       = self.gneb_step_callback
-            self.children[-1].exit_callback            = self.exit_callback
-            self.children[-1].before_gneb_callback     = self.before_gneb_callback
-            self.children[-1].before_llg_callback      = self.before_llg_callback
-            self.children[-1].after_llg_callback       = self.after_llg_callback
-            self.children[-1].n_iterations_check       = self.n_iterations_check
-            self.children[-1].n_checks_save            = self.n_checks_save
-            self.children[-1].allow_split              = self.allow_split
-            self.children[-1].max_depth                = self.max_depth
-            self.children[-1].chain_write_fileformat   = self.chain_write_fileformat
+            self.children[-1].max_total_iterations = self.max_total_iterations
+            self.children[-1].state_prepare_callback = self.state_prepare_callback
+            self.children[-1].gneb_step_callback = self.gneb_step_callback
+            self.children[-1].exit_callback = self.exit_callback
+            self.children[-1].before_gneb_callback = self.before_gneb_callback
+            self.children[-1].before_llg_callback = self.before_llg_callback
+            self.children[-1].after_llg_callback = self.after_llg_callback
+            self.children[-1].n_iterations_check = self.n_iterations_check
+            self.children[-1].n_checks_save = self.n_checks_save
+            self.children[-1].allow_split = self.allow_split
+            self.children[-1].max_depth = self.max_depth
+            self.children[-1].chain_write_fileformat = self.chain_write_fileformat
 
             self.child_indices.append([i1, i2])
             # Write the chain file
-            chain_write_between(p_state, self.children[-1].chain_file, i1, i2, fileformat=self.chain_write_fileformat)
+            chain_write_between(
+                p_state,
+                self.children[-1].chain_file,
+                i1,
+                i2,
+                fileformat=self.chain_write_fileformat,
+            )
 
         if p_state:
             _helper(p_state)
         else:
             from spirit import state
+
             with state.State(self.input_file) as p_state:
                 self._prepare_state(p_state)
                 _helper(p_state)
 
-        return self.children[-1] # Return a reference to the child that has just been added
+        return self.children[
+            -1
+        ]  # Return a reference to the child that has just been added
 
     def exit(self, p_state):
         """Call this when p_state gets deleted"""
         self.save_chain(p_state)
 
-        if(self.exit_callback):
+        if self.exit_callback:
             self.exit_callback(self, p_state)
 
         if self.chain_file != self.chain_file_post_run:
-            self.log("Copying chain_file {} to {}".format(self.chain_file, self.chain_file_post_run))
+            self.log(
+                "Copying chain_file {} to {}".format(
+                    self.chain_file, self.chain_file_post_run
+                )
+            )
             shutil.copyfile(self.chain_file, self.chain_file_post_run)
 
     def relax_intermediate_minima(self, p_state=None):
         from spirit import state, chain, simulation
+
         if not p_state is None:
             self.log("Relaxing intermediate minima")
 
             for idx_minimum in self.intermediate_minima:
                 self.log(f"Relaxing {idx_minimum}")
-                simulation.start(p_state, simulation.METHOD_LLG, self.solver_llg, idx_image = idx_minimum)
+                simulation.start(
+                    p_state,
+                    simulation.METHOD_LLG,
+                    self.solver_llg,
+                    idx_image=idx_minimum,
+                )
             chain.update_data(p_state)
             self.update_energy_path(p_state)
             if self.after_llg_callback:
@@ -487,12 +584,12 @@ class GNEB_Node(NodeMixin):
         # Instantiate the GNEB nodes
         noi = chain.get_noi(p_state)
         # Creates a list of all indices that would be start/end points of new chains
-        idx_list = [0, *self.intermediate_minima, noi-1]
+        idx_list = [0, *self.intermediate_minima, noi - 1]
         # From the previous list, creates a list of pairs of start/end points
-        idx_pairs = [ (idx_list[i], idx_list[i+1]) for i in range(len(idx_list)-1) ]
+        idx_pairs = [(idx_list[i], idx_list[i + 1]) for i in range(len(idx_list) - 1)]
 
         # First create all the instances of GNEB nodes
-        for i1,i2 in idx_pairs:
+        for i1, i2 in idx_pairs:
             self.add_child(i1, i2, p_state)
 
     def run_children(self):
@@ -511,31 +608,46 @@ class GNEB_Node(NodeMixin):
         import numpy as np
         from spirit import chain, transition
         from spirit.parameters import gneb
+
         noi = chain.get_noi(p_state)
 
-        idx_max  = np.argmax(self.current_energy_path.total_energy)
+        idx_max = np.argmax(self.current_energy_path.total_energy)
 
-        delta_Rx      = [ self.current_energy_path.reaction_coordinate[i+1] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-1) ]
-        delta_Rx_2    = [ self.current_energy_path.reaction_coordinate[i+2] - self.current_energy_path.reaction_coordinate[i] for i in range(noi-2) ]
-        max_delta_Rx  = np.max(delta_Rx)
+        delta_Rx = [
+            self.current_energy_path.reaction_coordinate[i + 1]
+            - self.current_energy_path.reaction_coordinate[i]
+            for i in range(noi - 1)
+        ]
+        delta_Rx_2 = [
+            self.current_energy_path.reaction_coordinate[i + 2]
+            - self.current_energy_path.reaction_coordinate[i]
+            for i in range(noi - 2)
+        ]
+        max_delta_Rx = np.max(delta_Rx)
         min_delta_Rx2 = np.min(delta_Rx_2)
 
         if max_delta_Rx > (1 + np.abs(tol)) * min_delta_Rx2:
             self.log("Rebalancing chain")
-            self.log("      Max. Delta Rx {}, Min. Delta Rx2 {}".format(max_delta_Rx, min_delta_Rx2))
-            idx   = np.argmax(delta_Rx)
+            self.log(
+                "      Max. Delta Rx {}, Min. Delta Rx2 {}".format(
+                    max_delta_Rx, min_delta_Rx2
+                )
+            )
+            idx = np.argmax(delta_Rx)
             idx_2 = np.argmin(delta_Rx_2)
-            self.log("      Inserting after idx {}, deleting idx {}".format(idx, idx_2+1))
+            self.log(
+                "      Inserting after idx {}, deleting idx {}".format(idx, idx_2 + 1)
+            )
 
             # Delete the image that was too densely spaced. this will shift all indices greater than idx_2+1
-            chain.delete_image(p_state, idx_image = idx_2+1)
+            chain.delete_image(p_state, idx_image=idx_2 + 1)
 
             # Correct the index if necessary
-            if(idx > idx_2+1) < idx:
+            if (idx > idx_2 + 1) < idx:
                 idx -= 1
 
             chain.insert_image_after(p_state, idx)
-            transition.homogeneous(p_state, idx, idx+2)
+            transition.homogeneous(p_state, idx, idx + 2)
 
     def increase_noi(self, p_state=None):
         """Increases the noi by (roughly) a factor of two until the number of images is at least as large as target_noi"""
@@ -545,10 +657,14 @@ class GNEB_Node(NodeMixin):
             self._prepare_state(p_state)
             self.noi = chain.get_noi(p_state)
 
-            if(self.noi < self.target_noi):
-                self.log("Too few images ({}). Inserting additional interpolated images".format(self.noi))
+            if self.noi < self.target_noi:
+                self.log(
+                    "Too few images ({}). Inserting additional interpolated images".format(
+                        self.noi
+                    )
+                )
 
-            while(self.noi < self.target_noi):
+            while self.noi < self.target_noi:
                 transition.homogeneous_insert_interpolated(p_state, 1)
                 self.noi = chain.get_noi(p_state)
 
@@ -568,9 +684,13 @@ class GNEB_Node(NodeMixin):
         if self.moving_endpoints is not None:
             parameters.gneb.set_moving_endpoints(p_state, self.moving_endpoints)
             if self.translating_endpoints is not None:
-                parameters.gneb.set_translating_endpoints(p_state, self.translating_endpoints)
+                parameters.gneb.set_translating_endpoints(
+                    p_state, self.translating_endpoints
+                )
             if self.delta_Rx_left is not None and self.delta_Rx_right is not None:
-                parameters.gneb.set_equilibrium_delta_Rx(p_state, self.delta_Rx_left, self.delta_Rx_right)
+                parameters.gneb.set_equilibrium_delta_Rx(
+                    p_state, self.delta_Rx_left, self.delta_Rx_right
+                )
 
         # The state prepare callback can be used to change the state before execution of any other commands
         # One could e.g. use the hamiltonian API to change interaction parameters instead of relying only on the input file
@@ -582,7 +702,9 @@ class GNEB_Node(NodeMixin):
             raise Exception("Chain file does not exist!")
 
         if self.path_shortening_constant > 0:
-            parameters.gneb.set_path_shortening_constant(p_state, self.path_shortening_constant)
+            parameters.gneb.set_path_shortening_constant(
+                p_state, self.path_shortening_constant
+            )
 
         # Read the file
         io.chain_read(p_state, self.chain_file)
@@ -594,16 +716,21 @@ class GNEB_Node(NodeMixin):
 
     def check_run_condition(self):
         """Returns True if the run loop should be continued."""
-        condition_minima     = len(self.intermediate_minima) <= 0
-        condition_iterations = self.total_iterations < self.max_total_iterations or self.max_total_iterations < 0
+        condition_minima = len(self.intermediate_minima) <= 0
+        condition_iterations = (
+            self.total_iterations < self.max_total_iterations
+            or self.max_total_iterations < 0
+        )
         condition_convergence = not self._converged
 
-        if self.allow_split and self.depth < self.max_depth: # Only care about minima if splitting is allowed
+        if (
+            self.allow_split and self.depth < self.max_depth
+        ):  # Only care about minima if splitting is allowed
             result = condition_minima and condition_iterations and condition_convergence
         else:
             result = condition_iterations and condition_convergence
 
-        if not result: # We are stopping and log the reason
+        if not result:  # We are stopping and log the reason
             reason = ""
             if self.allow_split and not condition_minima:
                 reason = "Intermediate minima found"
@@ -612,13 +739,13 @@ class GNEB_Node(NodeMixin):
             elif not condition_convergence:
                 reason = "Converged"
 
-            self.log("Stop running. Reason: {}".format( reason ))
+            self.log("Stop running. Reason: {}".format(reason))
 
         return result
 
     def run(self):
         """Run GNEB with checks after a certain number of iterations"""
-        if(len(self.children) != 0): # If not a leaf node call recursively on children
+        if len(self.children) != 0:  # If not a leaf node call recursively on children
             self.run_children()
             return
 
@@ -626,6 +753,7 @@ class GNEB_Node(NodeMixin):
             self.log("Running")
 
             from spirit import state, simulation, io
+
             self._converged = False
             self.increase_noi()
 
@@ -640,11 +768,16 @@ class GNEB_Node(NodeMixin):
                 try:
                     self.log("Starting GNEB iterations")
                     n_checks = 0
-                    while(self.check_run_condition()):
+                    while self.check_run_condition():
 
-                        info = simulation.start(p_state, simulation.METHOD_GNEB, self.solver_gneb, n_iterations=self.n_iterations_check)
+                        info = simulation.start(
+                            p_state,
+                            simulation.METHOD_GNEB,
+                            self.solver_gneb,
+                            n_iterations=self.n_iterations_check,
+                        )
                         self.update_energy_path(p_state)
-                        self.check_for_minima() # Writes the intermediate minima list
+                        self.check_for_minima()  # Writes the intermediate minima list
                         n_checks += 1
                         self.total_iterations += info.total_iterations
 
@@ -652,18 +785,22 @@ class GNEB_Node(NodeMixin):
                         self.log("Total iterations = {}".format(self.total_iterations))
                         self.log("      max.torque = {}".format(info.max_torque))
                         self.log("      ips        = {}".format(info.total_ips))
-                        self.log("      Delta E    = {}".format(self.current_energy_path.barrier()))
+                        self.log(
+                            "      Delta E    = {}".format(
+                                self.current_energy_path.barrier()
+                            )
+                        )
 
                         self._converged = info.max_torque < self.convergence
 
                         self.history.append([self.total_iterations, info.max_torque])
 
                         # Step callback to e.g plot chains
-                        if(self.gneb_step_callback):
+                        if self.gneb_step_callback:
                             self.gneb_step_callback(self, p_state)
 
                         # Save the chain periodically
-                        if(n_checks % self.n_checks_save == 0):
+                        if n_checks % self.n_checks_save == 0:
                             self.save_chain(p_state)
 
                         # Rebalancing
@@ -686,18 +823,20 @@ class GNEB_Node(NodeMixin):
             self.log("Finished!")
 
         except Exception as e:
-            self.log("Exception during 'run': {}".format(str(e))) # Log the exception and re-raise
+            self.log(
+                "Exception during 'run': {}".format(str(e))
+            )  # Log the exception and re-raise
             self.log(traceback.format_exc())
             raise e
 
-    def prepare_moving_endpoints(self, idx_mid = -1):
+    def prepare_moving_endpoints(self, idx_mid=-1):
         from spirit import chain, io, state, parameters
 
         self.log("Preparing for moving endpoints")
 
-        self.target_noi       = 3
+        self.target_noi = 3
         self.moving_endpoints = True
-        self.image_types      = [[1, parameters.gneb.IMAGE_CLIMBING]]
+        self.image_types = [[1, parameters.gneb.IMAGE_CLIMBING]]
 
         with state.State(self.input_file) as p_state:
             self._prepare_state(p_state)
@@ -711,8 +850,8 @@ class GNEB_Node(NodeMixin):
 
             self.log("idx_mid = {}".format(idx_mid))
 
-            if(idx_mid >= 1 and idx_mid < noi-1):
-                for i in range(idx_mid-1):
+            if idx_mid >= 1 and idx_mid < noi - 1:
+                for i in range(idx_mid - 1):
                     chain.delete_image(p_state, idx_image=0)
                 for i in range(noi - idx_mid - 2):
                     chain.pop_back(p_state)
@@ -728,10 +867,10 @@ class GNEB_Node(NodeMixin):
 
         self.log("Preparing for dimer endpoints")
 
-        self.target_noi            = 2
-        self.moving_endpoints      = True
+        self.target_noi = 2
+        self.moving_endpoints = True
         self.translating_endpoints = True
-        self.image_types           = []
+        self.image_types = []
 
         with state.State(self.input_file) as p_state:
             self._prepare_state(p_state)
