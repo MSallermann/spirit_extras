@@ -1,22 +1,28 @@
 import json, os
 
+
 class Calculation_Folder:
     """Represents one folder of a calculation."""
 
-    def __init__(self, output_folder, create=False, descriptor_file = "descriptor.json"):
-        self.output_folder            = output_folder
-        self._descriptor_file_name    = descriptor_file
+    def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
+        self.output_folder = output_folder
         self.descriptor = {}
 
-        self._lock_file = os.path.join(self.output_folder, "~lock")
+        self._descriptor_file_name = descriptor_file
+        self._lock_file = "~lock"
 
         if not os.path.isdir(self.output_folder):
             if not create:
-                raise Exception("Directory {} either does not exist or is a file that is not a directory. Call with 'create=True' to create it.".format(self.output_folder))
+                raise Exception(
+                    f"Directory {self.output_folder} either does not exist or is a file that is not a directory. Call constructor with 'create=True' to create it."
+                )
             else:
                 os.makedirs(self.output_folder)
 
         self.from_json()
+
+    def __str__(self):
+        return str(self.output_folder)
 
     def __getitem__(self, key):
         return self.descriptor[key]
@@ -24,18 +30,16 @@ class Calculation_Folder:
     def __setitem__(self, key, value):
         self.descriptor[key] = value
 
-    def get_descriptor_file_path(self):
-        return os.path.join(self.output_folder, self._descriptor_file_name)
-
     def from_json(self):
-        if os.path.exists(self.get_descriptor_file_path()):
-            with open(self.get_descriptor_file_path(), "r") as f:
+        if os.path.exists(self.to_abspath(self._descriptor_file_name)):
+            with open(self.to_abspath(self._descriptor_file_name), "r") as f:
                 self.descriptor = json.load(f)
 
     def lock(self):
         """Checks for lockfile in folder. If no lock file is present the lock file is created and True is returned. Can be used to signal to other processes"""
-        if not os.path.exists(self._lock_file):
-            with open(self._lock_file, "w") as f:
+        lock_file_path = self.to_abspath(self._lock_file)
+        if not os.path.exists(lock_file_path):
+            with open(lock_file_path, "w") as f:
                 pass
             return True
         else:
@@ -43,15 +47,17 @@ class Calculation_Folder:
 
     def locked(self):
         """Check if folder is locked."""
-        if not os.path.exists(self._lock_file):
+        lock_file_path = self.to_abspath(self._lock_file)
+        if not os.path.exists(lock_file_path):
             return False
         else:
             return True
 
     def unlock(self):
         """Unlocks."""
-        if os.path.exists(self._lock_file):
-            os.remove(self._lock_file)
+        lock_file_path = self.to_abspath(self._lock_file)
+        if os.path.exists(lock_file_path):
+            os.remove(lock_file_path)
             return True
         else:
             return False
@@ -64,9 +70,9 @@ class Calculation_Folder:
         m = pattern.findall(string)
 
         for temp in m:
-            split_match = temp[1:-1].split(':')
+            split_match = temp[1:-1].split(":")
 
-            if len(split_match) == 2: ## if len(2) we have a format string to deal with
+            if len(split_match) == 2:  ## if len(2) we have a format string to deal with
                 format_string = split_match[1]
                 literal = "{0:" + format_string + "}"
             else:
@@ -74,15 +80,15 @@ class Calculation_Folder:
 
             key = split_match[0]
             replace = literal.format(dict[key])
-            string = string.replace( temp, replace)
+            string = string.replace(temp, replace)
 
         return string
 
     def format(self, str):
         """Formats a string based on the calculation descriptor.
         Example:
-            calc.descriptor = { "number": 123.23424, "name" : "bob"}
-            calc.format('my_string_{key:.3f}_{name}') = 'my_string_123.234_bob'
+            calc.descriptor = {"number": 123.23, "name" : "bob"}
+            calc.format('my_string_{number:.1f}_{name}') = 'my_string_123.2_bob'
         """
         return self._replace_from_dict(str, self.descriptor)
 
@@ -93,22 +99,22 @@ class Calculation_Folder:
         return os.path.relpath(absolute_path, self.output_folder)
 
     def to_json(self):
-        descriptor_file = self.to_abspath( self._descriptor_file_name )
+        descriptor_file = self.to_abspath(self._descriptor_file_name)
         file, ext = os.path.splitext(self._descriptor_file_name)
 
         # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
-        temporary_file = self.to_abspath( file + "__temp__" + ext )
+        temporary_file = self.to_abspath(file + "__temp__" + ext)
         try:
             with open(temporary_file, "w") as f:
                 f.write(json.dumps(self.descriptor, indent=4))
                 # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
-                if os.path.exists( descriptor_file ):
-                    os.remove( descriptor_file )
-                os.rename( temporary_file, descriptor_file )
+                if os.path.exists(descriptor_file):
+                    os.remove(descriptor_file)
+                os.rename(temporary_file, descriptor_file)
         except Exception as e:
             print("JSON serialization has encountered an error.")
             print(f"The original file '{descriptor_file}' has not been changed.")
             # We delete the temporary file, if it exists
-            if os.path.exists( temporary_file ):
-                os.remove( temporary_file )
+            if os.path.exists(temporary_file):
+                os.remove(temporary_file)
             raise e
