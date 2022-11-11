@@ -30,6 +30,15 @@ class Calculation_Folder:
     def __setitem__(self, key, value):
         self.descriptor[key] = value
 
+    def __contains__(self, key):
+        return key in self.descriptor
+
+    def items(self):
+        return self.descriptor.items()
+
+    def keys(self):
+        return self.descriptor.keys()
+
     def from_json(self):
         if os.path.exists(self.to_abspath(self._descriptor_file_name)):
             with open(self.to_abspath(self._descriptor_file_name), "r") as f:
