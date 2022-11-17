@@ -1,7 +1,7 @@
 import json, os, pprint, shutil
 
 
-class Calculation_Folder:
+class Calculation_Folder(os.PathLike):
     """Represents one folder of a calculation."""
 
     def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
@@ -21,6 +21,9 @@ class Calculation_Folder:
 
         self.from_json()
 
+    def __fspath__(self):
+        return self.output_folder
+
     def __str__(self):
         return str(self.output_folder)
 
@@ -33,11 +36,29 @@ class Calculation_Folder:
     def __contains__(self, key):
         return key in self.descriptor
 
+    def __len__(self):
+        return len(self.descriptor)
+
     def items(self):
         return self.descriptor.items()
 
     def keys(self):
         return self.descriptor.keys()
+
+    def values(self):
+        return self.descriptor.values()
+
+    def pop(self, key, default=None):
+        return self.descriptor.pop(key, default)
+
+    def popitem(self):
+        return self.descriptor.popitem()
+
+    def update(self, kv_pairs):
+        self.descriptor.update(kv_pairs)
+
+    def get(self, key, default=None):
+        return self.descriptor.get(key, default)
 
     def to_abspath(self, relative_path):
         return os.path.join(self.output_folder, relative_path)
