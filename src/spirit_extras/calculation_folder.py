@@ -1,11 +1,11 @@
-import json, os
+import json, os, pprint, shutil
 
 
 class Calculation_Folder:
     """Represents one folder of a calculation."""
 
     def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
-        self.output_folder = output_folder
+        self.output_folder = os.path.abspath(output_folder)
         self.descriptor = {}
 
         self._descriptor_file_name = descriptor_file
@@ -39,10 +39,56 @@ class Calculation_Folder:
     def keys(self):
         return self.descriptor.keys()
 
+    def to_abspath(self, relative_path):
+        return os.path.join(self.output_folder, relative_path)
+
+    def to_relpath(self, absolute_path):
+        return os.path.relpath(absolute_path, self.output_folder)
+
+    def copy_file(self, source, rel_dest, create_subdirs=False):
+        """Copies a file to a relative path within the calculation fodler"""
+        dest = self.to_abspath(rel_dest)
+        dirname = os.path.dirname(dest)
+        if not os.path.isdir(dirname):
+            if create_subdirs:
+                os.makedirs(dirname)
+            else:
+                raise Exception(
+                    "Cannot create new subdirectory in calculation folder unless called with `create_subdirs=True`"
+                )
+        shutil.copyfile(source, dest)
+
+    def info_string(self):
+        res = f"Folder: '{str(self)}'\n"
+        res += f"Descriptor: '{self._descriptor_file_name}'\n"
+        res += pprint.pformat(self.descriptor)
+        return res
+
     def from_json(self):
         if os.path.exists(self.to_abspath(self._descriptor_file_name)):
             with open(self.to_abspath(self._descriptor_file_name), "r") as f:
                 self.descriptor = json.load(f)
+
+    def to_json(self):
+        descriptor_file = self.to_abspath(self._descriptor_file_name)
+        file, ext = os.path.splitext(self._descriptor_file_name)
+
+        # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
+        temporary_file = self.to_abspath(file + "__temp__" + ext)
+        try:
+            with open(temporary_file, "w") as f:
+                f.write(json.dumps(self.descriptor, indent=4))
+                # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
+                if os.path.exists(descriptor_file):
+                    os.remove(descriptor_file)
+                os.rename(temporary_file, descriptor_file)
+        except Exception as e:
+            print("JSON serialization has encountered an error.")
+            print(f"The original file '{descriptor_file}' has not been changed.")
+            # We delete the temporary file, if it exists
+            if os.path.exists(temporary_file):
+                os.remove(temporary_file)
+            raise e
 
     def lock(self):
         """Checks for lockfile in folder. If no lock file is present the lock file is created and True is returned. Can be used to signal to other processes"""
@@ -100,30 +146,3 @@ class Calculation_Folder:
             calc.format('my_string_{number:.1f}_{name}') = 'my_string_123.2_bob'
         """
         return self._replace_from_dict(str, self.descriptor)
-
-    def to_abspath(self, relative_path):
-        return os.path.join(self.output_folder, relative_path)
-
-    def to_relpath(self, absolute_path):
-        return os.path.relpath(absolute_path, self.output_folder)
-
-    def to_json(self):
-        descriptor_file = self.to_abspath(self._descriptor_file_name)
-        file, ext = os.path.splitext(self._descriptor_file_name)
-
-        # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
-        temporary_file = self.to_abspath(file + "__temp__" + ext)
-        try:
-            with open(temporary_file, "w") as f:
-                f.write(json.dumps(self.descriptor, indent=4))
-                # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
-                if os.path.exists(descriptor_file):
-                    os.remove(descriptor_file)
-                os.rename(temporary_file, descriptor_file)
-        except Exception as e:
-            print("JSON serialization has encountered an error.")
-            print(f"The original file '{descriptor_file}' has not been changed.")
-            # We delete the temporary file, if it exists
-            if os.path.exists(temporary_file):
-                os.remove(temporary_file)
-            raise e
