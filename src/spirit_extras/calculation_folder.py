@@ -46,7 +46,7 @@ class Calculation_Folder:
         return os.path.relpath(absolute_path, self.output_folder)
 
     def copy_file(self, source, rel_dest, create_subdirs=False):
-        """Copies a file to a relative path within the calculation fodler"""
+        """Copies a file to a relative path within the calculation folder"""
         dest = self.to_abspath(rel_dest)
         dirname = os.path.dirname(dest)
         if not os.path.isdir(dirname):
