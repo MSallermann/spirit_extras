@@ -18,7 +18,7 @@ class Calculation_Folder_Test(unittest.TestCase):
         folder = calculation_folder.Calculation_Folder(self.FOLDER)
 
     def test_creation(self):
-        # Should fail because create=False
+        # Should work because create=True
         folder = calculation_folder.Calculation_Folder(self.FOLDER, create=True)
 
         folder["key1"] = 100112.123234
