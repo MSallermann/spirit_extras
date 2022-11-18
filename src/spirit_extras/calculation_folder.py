@@ -26,6 +26,9 @@ class Calculation_Folder(os.PathLike, dict):
     def __fspath__(self):
         return self.output_folder
 
+    def __add__(self, other):
+        return self.output_folder + other
+
     def to_abspath(self, relative_path):
         return os.path.join(self, relative_path)
 

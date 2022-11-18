@@ -64,7 +64,6 @@ class Calculation_Folder_Test(unittest.TestCase):
     def test_path_manipulations(self):
         self.test_creation()
         folder = calculation_folder.Calculation_Folder(self.FOLDER, create=False)
-        print(folder.info_string())
         os.path.join(folder, "subdir")
 
     @unittest.expectedFailure
@@ -92,3 +91,4 @@ class Calculation_Folder_Test(unittest.TestCase):
         self.assertFalse(folder.locked())
 
         print(folder.info_string())
+        print(folder + "/ds")
