@@ -4,18 +4,42 @@ from spirit_extras import calculation_folder
 
 
 class Calculation_Folder_Test(unittest.TestCase):
+    FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), "test_folder"))
+    FOLDER2 = os.path.abspath(os.path.join(os.path.dirname(__file__), "test_folder2"))
+
     def setUp(self) -> None:
-        self.FOLDER = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "test_folder")
-        )
         if os.path.exists(self.FOLDER):
             shutil.rmtree(self.FOLDER)
         return super().setUp()
 
+    def tearDown(self) -> None:
+        if os.path.exists(self.FOLDER):
+            shutil.rmtree(self.FOLDER)
+        return super().tearDown()
+
     @unittest.expectedFailure
-    def test_creation_fail(self):
+    def test_creation_fail_no_create(self):
         # Should fail because create=False
         folder = calculation_folder.Calculation_Folder(self.FOLDER)
+
+    @unittest.expectedFailure
+    def test_creation_fail_descriptor(self):
+        # Should fail because descriptor file is in subdir
+        folder = calculation_folder.Calculation_Folder(
+            self.FOLDER, create=True, descriptor_file="subdir/params.json"
+        )
+
+    def test_different_desc_file(self):
+        folder1 = calculation_folder.Calculation_Folder(
+            self.FOLDER, create=True, descriptor_file="tmp/../params.json"
+        )
+        folder1["key"] = "value"
+        folder1.to_json()
+
+        folder2 = calculation_folder.Calculation_Folder(
+            self.FOLDER, descriptor_file="params.json"
+        )
+        self.assertEqual(folder2["key"], folder1["key"])
 
     def test_creation(self):
         # Should work because create=True
@@ -73,6 +97,17 @@ class Calculation_Folder_Test(unittest.TestCase):
         # Should fail because create_subdirs=False
         folder.copy_file(__file__, "subfolder/script.py")
 
+    def test_copy_directory(self):
+        shutil.rmtree(self.FOLDER2)
+
+        self.test_creation()
+        shutil.copytree(self.FOLDER, self.FOLDER2)
+
+        folder = calculation_folder.Calculation_Folder(self.FOLDER2)
+        self.assertEqual(folder["key2"], "string")
+
+        shutil.rmtree(self.FOLDER2)
+
     def test_misc(self):
         self.test_creation()
         folder = calculation_folder.Calculation_Folder(self.FOLDER, create=False)
@@ -90,5 +125,7 @@ class Calculation_Folder_Test(unittest.TestCase):
         self.assertTrue(folder.unlock())
         self.assertFalse(folder.locked())
 
-        print(folder.info_string())
-        print(folder + "/ds")
+        # Should at least not throw an exception
+        folder.info_string()
+
+        self.assertEqual(folder + "/something", self.FOLDER + "/something")
