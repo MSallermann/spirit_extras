@@ -1,12 +1,11 @@
 import json, os, pprint, shutil
 
 
-class Calculation_Folder(os.PathLike):
+class Calculation_Folder(os.PathLike, dict):
     """Represents one folder of a calculation."""
 
     def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
         self.output_folder = os.path.abspath(output_folder)
-        self.descriptor = {}
 
         self._descriptor_file_name = descriptor_file
         self._lock_file = "~lock"
@@ -21,50 +20,17 @@ class Calculation_Folder(os.PathLike):
 
         self.from_json()
 
-    def __fspath__(self):
-        return self.output_folder
-
     def __str__(self):
         return str(self.output_folder)
 
-    def __getitem__(self, key):
-        return self.descriptor[key]
-
-    def __setitem__(self, key, value):
-        self.descriptor[key] = value
-
-    def __contains__(self, key):
-        return key in self.descriptor
-
-    def __len__(self):
-        return len(self.descriptor)
-
-    def items(self):
-        return self.descriptor.items()
-
-    def keys(self):
-        return self.descriptor.keys()
-
-    def values(self):
-        return self.descriptor.values()
-
-    def pop(self, key, default=None):
-        return self.descriptor.pop(key, default)
-
-    def popitem(self):
-        return self.descriptor.popitem()
-
-    def update(self, kv_pairs):
-        self.descriptor.update(kv_pairs)
-
-    def get(self, key, default=None):
-        return self.descriptor.get(key, default)
+    def __fspath__(self):
+        return self.output_folder
 
     def to_abspath(self, relative_path):
-        return os.path.join(self.output_folder, relative_path)
+        return os.path.join(self, relative_path)
 
     def to_relpath(self, absolute_path):
-        return os.path.relpath(absolute_path, self.output_folder)
+        return os.path.relpath(absolute_path, self)
 
     def copy_file(self, source, rel_dest, create_subdirs=False):
         """Copies a file to a relative path within the calculation folder"""
@@ -82,13 +48,13 @@ class Calculation_Folder(os.PathLike):
     def info_string(self):
         res = f"Folder: '{str(self)}'\n"
         res += f"Descriptor: '{self._descriptor_file_name}'\n"
-        res += pprint.pformat(self.descriptor)
+        res += pprint.pformat(self)
         return res
 
     def from_json(self):
         if os.path.exists(self.to_abspath(self._descriptor_file_name)):
             with open(self.to_abspath(self._descriptor_file_name), "r") as f:
-                self.descriptor = json.load(f)
+                super().__init__(json.load(f))
 
     def to_json(self):
         descriptor_file = self.to_abspath(self._descriptor_file_name)
@@ -98,7 +64,7 @@ class Calculation_Folder(os.PathLike):
         temporary_file = self.to_abspath(file + "__temp__" + ext)
         try:
             with open(temporary_file, "w") as f:
-                f.write(json.dumps(self.descriptor, indent=4))
+                f.write(json.dumps(self, indent=4))
                 # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
                 if os.path.exists(descriptor_file):
                     os.remove(descriptor_file)
@@ -166,4 +132,4 @@ class Calculation_Folder(os.PathLike):
             calc.descriptor = {"number": 123.23, "name" : "bob"}
             calc.format('my_string_{number:.1f}_{name}') = 'my_string_123.2_bob'
         """
-        return self._replace_from_dict(str, self.descriptor)
+        return self._replace_from_dict(str, self)
