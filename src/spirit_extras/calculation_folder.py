@@ -5,9 +5,19 @@ class Calculation_Folder(os.PathLike, dict):
     """Represents one folder of a calculation."""
 
     def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
-        self.output_folder = os.path.abspath(output_folder)
+        self.output_folder = os.path.normpath(os.path.abspath(output_folder))
 
-        self._descriptor_file_name = descriptor_file
+        # We enforce that the descriptor file is at the root of the output folder
+        if (
+            not os.path.normpath(os.path.dirname(self.to_abspath(descriptor_file)))
+            == self.output_folder
+        ):
+            raise Exception(
+                "The descriptor file has to be at the root of the calculation folder!"
+            )
+
+        self._descriptor_file_name = os.path.normpath(descriptor_file)
+
         self._lock_file = "~lock"
 
         if not os.path.isdir(self.output_folder):
