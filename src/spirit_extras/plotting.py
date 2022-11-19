@@ -112,8 +112,7 @@ class Paper_Plot:
 
     def crop(self, image, width, height=None):
         if height is None:
-            height = image.shape[1]
-
+            height = image.shape[0]
         o = [int(image.shape[0] / 2), int(image.shape[1] / 2)]
         lower_height = o[0] - int(height / 2)
         lower_width = o[1] - int(width / 2)
@@ -142,10 +141,13 @@ class Paper_Plot:
         a.tick_params(
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
         )
-        for k in which:
+        for k in ["left", "right", "top", "bottom"]:
             s = a.spines[k]
-            s.set_visible(True)
-            s.set_color(color)
+            if k in which:
+                s.set_visible(True)
+                s.set_color(color)
+            else:
+                s.set_visible(False)
         return a
 
     def row(self, row_idx, sl=slice(None, None, None), gs=None):
