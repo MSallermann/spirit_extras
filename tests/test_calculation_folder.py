@@ -98,7 +98,8 @@ class Calculation_Folder_Test(unittest.TestCase):
         folder.copy_file(__file__, "subfolder/script.py")
 
     def test_copy_directory(self):
-        shutil.rmtree(self.FOLDER2)
+        if os.path.exists(self.FOLDER2):
+            shutil.rmtree(self.FOLDER2)
 
         self.test_creation()
         shutil.copytree(self.FOLDER, self.FOLDER2)
