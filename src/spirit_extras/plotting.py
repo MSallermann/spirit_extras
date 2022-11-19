@@ -113,9 +113,11 @@ class Paper_Plot:
     def crop_to_content(
         self, image, background_color=None, replace_background_color=None
     ):
-        img_copy = np.array(image)
+        N_CHANNELS = image.shape[-1]  # Number of channels in the picture
+        image_shape = image.shape
         n_pixels = image.shape[0] * image.shape[1]
-        img_flatten = img_copy.reshape((n_pixels, 4))
+
+        img_flatten = image.reshape((n_pixels, N_CHANNELS))
 
         # If no background color is specified, we take the most frequent color
         if background_color is None:
@@ -133,6 +135,20 @@ class Paper_Plot:
         upper_width = np.max(indices[:, 1])
 
         if not replace_background_color is None:
+            N_CHANNELS_BG = len(replace_background_color)
+
+            # If the background color has more channels than the picture, we need to introduce the alpha channel
+            if N_CHANNELS_BG > N_CHANNELS and replace_background_color[-1] != 1.0:
+                image_copy = np.ones(shape=(image_shape[0], image_shape[1], 4))
+                image_copy[:, :, :3] = image
+                image = image_copy
+                background_color = [
+                    *background_color,
+                    1.0,
+                ]  # Extend the background color with the alpha channel
+            elif N_CHANNELS_BG < N_CHANNELS:
+                replace_background_color = [*replace_background_color, 1.0]
+
             indices = np.argwhere(np.all(image[:, :] == background_color, axis=2))
             image[indices[:, 0], indices[:, 1], :] = replace_background_color
 
