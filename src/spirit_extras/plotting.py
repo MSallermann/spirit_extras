@@ -110,6 +110,34 @@ class Paper_Plot:
             transform=ax.transAxes
         )
 
+    def crop_to_content(
+        self, image, background_color=None, replace_background_color=None
+    ):
+        img_copy = np.array(image)
+        n_pixels = image.shape[0] * image.shape[1]
+        img_flatten = img_copy.reshape((n_pixels, 4))
+
+        # If no background color is specified, we take the most frequent color
+        if background_color is None:
+            unique, counts = np.unique(img_flatten, return_counts=True, axis=0)
+            idx_max_count = np.argmax(counts)
+            most_frequent_color = unique[idx_max_count]
+            background_color = most_frequent_color
+
+        # I think I know why this works
+        indices = np.argwhere(np.any(image[:, :] != background_color, axis=2))
+
+        lower_height = np.min(indices[:, 0])
+        upper_height = np.max(indices[:, 0])
+        lower_width = np.min(indices[:, 1])
+        upper_width = np.max(indices[:, 1])
+
+        if not replace_background_color is None:
+            indices = np.argwhere(np.all(image[:, :] == background_color, axis=2))
+            image[indices[:, 0], indices[:, 1], :] = replace_background_color
+
+        return image[lower_height:upper_height, lower_width:upper_width, :]
+
     def crop(self, image, width, height=None):
         if height is None:
             height = image.shape[0]
