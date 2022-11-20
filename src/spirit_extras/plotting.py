@@ -178,9 +178,20 @@ class Paper_Plot:
             s.set_visible(False)
 
     def spine_axis(
-        self, subplotspec, color="black", which=["left", "right", "top", "bottom"]
+        self,
+        spec,
+        color="black",
+        which=["left", "right", "top", "bottom"],
+        zorder=2,
+        label="spine",
     ):
-        a = self._fig.add_axes(subplotspec.get_position(self._fig), zorder=99)
+        try:
+            a = self._fig.add_axes(
+                spec.get_position(self._fig), zorder=zorder, label=label
+            )
+        except:
+            a = self._fig.add_axes(spec, zorder=zorder, label=label)
+
         a.set_facecolor([0, 0, 0, 0])
         a.tick_params(
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
