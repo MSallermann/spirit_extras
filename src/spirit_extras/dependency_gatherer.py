@@ -81,7 +81,7 @@ class Dependency_Gatherer:
             if not always_generate:
                 self.print_info(f"[{idx:^5}] Checking for '{path}'...", indent=0)
             else:
-                self.print_info(f"[{idx:^5}] Creating `{path}`", indent=0)
+                self.print_info(f"[{idx:^5}] Creating `{path}`...", indent=0)
 
             if os.path.exists(path) and not always_generate:
                 time_modified_epoch = os.path.getmtime(path)
@@ -105,12 +105,12 @@ class Dependency_Gatherer:
                     self.print_warning("NOT FOUND!", indent=8)
                     if cb is None:
                         self.print_err(
-                            " ... No callback to create file -> aborting", indent=8
+                            "No callback to create file -> aborting", indent=8
                         )
                         raise self.Dependency_Gatherer_Exception(
                             f"Cannot create missing dependency: `{path}`"
                         )
-                    self.print_info("Trying to create via callback function", indent=8)
+                    self.print_info("Trying to create via callback function...", indent=8)
 
                 try:
                     cb()
