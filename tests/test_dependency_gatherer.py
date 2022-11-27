@@ -33,6 +33,8 @@ class Dependency_Gatherer_Test(unittest.TestCase):
         for f in FILES:
             D.depends(f)
 
+        D.depends(__file__)
+
         D.depends(
             os.path.join(FOLDER, "does_not_exist.txt"),
             lambda: self.generate_file(os.path.join(FOLDER, "does_not_exist.txt")),

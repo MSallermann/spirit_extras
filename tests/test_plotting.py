@@ -5,7 +5,7 @@ from spirit_extras.plotting import Paper_Plot
 import matplotlib.pyplot as plt
 
 
-class Calculation_Folder_Test(unittest.TestCase):
+class Paper_Plot_Test(unittest.TestCase):
     SCRIPT_DIR = os.path.dirname(__file__)
     IMAGE_FOLDER = os.path.join(SCRIPT_DIR, "images")
 
