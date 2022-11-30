@@ -452,6 +452,51 @@ def gradient_line(ax, x, y, c, lw=2.0, cmap="viridis", c_norm=None, n_inter=10):
         pass
 
 
+def get_rgba_colors_red_blue(spins, opacity=1.0, cardinal=np.array([0, 0, 1])):
+    cardinal = np.asarray(cardinal)
+
+    def mix(x, y, a):
+        return x * (1.0 - a) + y * a
+
+    red = np.array([1, 0, 0, opacity])
+    blue = np.array([0, 0, 1, opacity])
+
+    rgba = []
+
+    for spin in spins:
+        projection_z = cardinal.dot(spin)
+        _rgba = mix(red, blue, (projection_z + 1.0) / 2.0)
+        rgba.append([_rgba])
+
+    return rgba
+
+
+def get_rgba_colors_red_green_blue(spins, opacity=1.0, cardinal=np.array([0, 0, 1])):
+    cardinal = np.asarray(cardinal)
+
+    def mix(x, y, a):
+        return x * (1.0 - a) + y * a
+
+    red = np.array([1, 0, 0, opacity])
+    green = np.array([0, 1, 0, opacity])
+    blue = np.array([0, 0, 1, opacity])
+
+    rgba = []
+
+    for spin in spins:
+        projection_z = cardinal.dot(spin)
+
+        if projection_z < 0:
+            _rgba = mix(green, red, -projection_z)
+
+        if projection_z >= 0:
+            _rgba = mix(green, blue, projection_z)
+
+        rgba.append([_rgba])
+
+    return rgba
+
+
 def get_rgba_colors(
     spins,
     opacity=1.0,
