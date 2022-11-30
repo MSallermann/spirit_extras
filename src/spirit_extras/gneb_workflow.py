@@ -392,7 +392,7 @@ class GNEB_Node(NodeMixin):
             return
         now = datetime.now()
         current_time = now.strftime("%m/%d/%Y, %H:%M:%S")
-        log_string = "{} [{:^35}] : {}".format(current_time, self.name, message)
+        log_string = "[{:^35}] {} : {}".format(self.name, current_time,message)
         with open(self.gneb_workflow_log_file, "a") as f:
             print(log_string, file=f)
 
@@ -595,9 +595,6 @@ class GNEB_Node(NodeMixin):
     def run_children(self):
         """Execute the run loop on all children"""
         # The following list determines the order in which we run the children of this node.
-        # We sort the run from largest to smallest energy barrier (hence the minus).
-        # We do this to explore the most 'interesting' paths first
-
         idx_children_run_order = list(range(len(self.children)))
 
         for i in idx_children_run_order:
