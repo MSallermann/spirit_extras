@@ -18,6 +18,47 @@ class Spin_System:
         sliced_spin_system.unordered = True  # For a general slice we do not necessarily retain the lattice structure
         return sliced_spin_system
 
+    def idx(self, ib, a, b, c):
+        """Computes the linear idx from coords in the bravais lattice.
+
+        Args:
+            ib (int): idx of spin in basis cell
+            a (int): first bravais translation index
+            b (int): second bravais translation index
+            c (int): third bravais translation index
+
+        Returns:
+            int: the linear index for the flattened spin/position arrays
+        """
+        return int(
+            ib + self.n_cell_atoms * (a + self.n_cells[0] * (b + self.n_cells[1] * c))
+        )
+
+    def tupel(self, idx):
+        """Computes the tupel of bravais indices from a linear idx.
+
+        Args:
+            idx (int): linear index
+
+        Returns:
+            list(int,int,int,int): list of bravais indices [idx_cell_atom, a, b, c]
+        """
+        idx_diff = idx
+
+        maxVal = np.array([self.n_cell_atoms, *self.n_cells])
+        tupel = [0, 0, 0, 0]
+
+        div = np.prod(maxVal[:-1])
+
+        for i in range(len(maxVal) - 1, 0, -1):
+            tupel[i] = int(idx_diff / div)
+            idx_diff -= tupel[i] * div
+            div /= maxVal[i - 1]
+
+        tupel[0] = int(idx_diff / div)
+
+        return tupel
+
     def copy(self):
         """Make a shallow copy of spin_system"""
         copy = Spin_System()
