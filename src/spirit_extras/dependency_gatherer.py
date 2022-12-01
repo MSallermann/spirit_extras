@@ -110,7 +110,9 @@ class Dependency_Gatherer:
                         raise self.Dependency_Gatherer_Exception(
                             f"Cannot create missing dependency: `{path}`"
                         )
-                    self.print_info("Trying to create via callback function...", indent=8)
+                    self.print_info(
+                        "Trying to create via callback function...", indent=8
+                    )
 
                 try:
                     cb()

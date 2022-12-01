@@ -392,7 +392,7 @@ class GNEB_Node(NodeMixin):
             return
         now = datetime.now()
         current_time = now.strftime("%m/%d/%Y, %H:%M:%S")
-        log_string = "[{:^35}] {} : {}".format(self.name, current_time,message)
+        log_string = "[{:^35}] {} : {}".format(self.name, current_time, message)
         with open(self.gneb_workflow_log_file, "a") as f:
             print(log_string, file=f)
 

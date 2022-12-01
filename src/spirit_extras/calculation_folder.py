@@ -75,6 +75,7 @@ class Calculation_Folder(os.PathLike, dict):
 
         # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
         temporary_file = self.to_abspath(file + "__temp__" + ext)
+
         try:
             with open(temporary_file, "w") as f:
                 f.write(json.dumps(self, indent=4))
