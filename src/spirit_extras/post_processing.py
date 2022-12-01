@@ -22,14 +22,38 @@ def skyrmion_circularity(
     positions,
     spins,
     center,
-    z_value=0,
-    background_direction=[0, 0, 1],
-    max_radius=1,
+    z_value=0.0,
+    max_radius=np.inf,
     cutoff_ring=0.33,
-    N_Segments=360,
+    N_Segments=36,
     N_rho=100,
 ):
-    """Try to compute the circularity of a Skyrmion"""
+    """Try to compute the circularity and radius of a skyrmion/
+
+    Args:
+        positions (array[nos, 3]): The spin positions
+        spins (array[nos, 3]): The spin directions
+        center (array[3]): The center of the skyrmion structure
+        z_value (float, optional): The s_z value at which the radius is defined. Defaults to inf.
+        max_radius (float, optional): The maximum distance of spins to the center considered for the computation. Defaults to -1.
+        cutoff_ring (float, optional): Max abs(spin_z - z_value) considered for the computation. Defaults to 0.33.
+        N_Segments (int, optional): Number of circular sections used to compute the circularity. Defaults to 36.
+        N_rho (int, optional): Number of points used in radial direction to find transition of spin_z value. Defaults to 100.
+
+    Raises:
+        Exception: Raises excpetions when numerical parameters need tuning.
+
+    Returns:
+        dictionary:     {
+                            "area",
+                            "circumference",
+                            "circularity",
+                            "average_radius",
+                            "rho_list",
+                            "circ_grid"
+                        }
+
+    """
 
     from spirit_extras import data
     from scipy.optimize import curve_fit, root
@@ -49,7 +73,7 @@ def skyrmion_circularity(
     # List of radii for each angular segment, initialized with the average_radius
     rho_list = np.ones(N_Segments) * max_radius / 2.0
 
-    # List of the points lieing onf the circumference, to be filled later
+    # List of the points lieing on the circumference (to be filled later)
     circ_grid = np.zeros((N_Segments, 2))
 
     circumference = 0
@@ -67,7 +91,7 @@ def skyrmion_circularity(
             ]
         )
 
-        # Interpolate the spins z component onto the circular grid
+        # Interpolate the spin z component onto the circular grid
         z_2dgrid = griddata(
             (positions_ring[:, 0], positions_ring[:, 1]),
             spins_ring[:, 2],
@@ -82,6 +106,13 @@ def skyrmion_circularity(
         z_2dgrid = z_2dgrid[~np.isnan(z_2dgrid)]
 
         # Interpolate the z component of the spins onto the radial direction
+        if len(rho_temp) < 2:
+            raise Exception(
+                "Not enough radial points for angular segment no {} (phi = {}). Try to increase N_rho or decrease max_radius.".format(
+                    i, phi
+                )
+            )
+
         z_func = interp1d(rho_temp, z_2dgrid, kind="linear")
 
         # Find where the z component crosses our target value
