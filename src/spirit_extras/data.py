@@ -28,11 +28,11 @@ class Spin_System:
                 )
             )
 
-        self.unordered = unordered
+        self._unordered = unordered
 
         # If shaped positions and spins are given, we perform some consistency checks and try to infer n_cells, if not given
         if self.is_shaped():
-            if self.unordered:
+            if self._unordered:
                 raise Exception(
                     "Only arrays of shape (nos,3) can be used when unordered=True"
                 )
@@ -53,33 +53,33 @@ class Spin_System:
                     )
 
         # If the system has order we need the lattice information
-        if not self.unordered:
+        if not self._unordered:
             for tmp in [n_cells, bravais_vectors]:
                 if tmp is None:
                     raise Exception(
                         "For an ordered system 'n_cells' and 'bravais_vectors' has to be provided"
                     )
 
-                self.n_cells = np.asarray(n_cells)
-                if self.n_cells.shape != (3,):
+                self._n_cells = np.asarray(n_cells)
+                if self._n_cells.shape != (3,):
                     raise Exception(
                         "n_cells has wrong shape. It should be (3), but is {}".format(
-                            self.n_cells.shape
+                            self._n_cells.shape
                         )
                     )
 
                 if basis is None:
-                    self.basis = np.array(
+                    self._basis = np.array(
                         [[0, 0, 0]]
                     )  # default for single basis systems
                 else:
-                    self.basis = np.asarray(basis)
+                    self._basis = np.asarray(basis)
 
-                if not self._check_shape(self.basis):
+                if not self._check_shape(self._basis):
                     raise Exception("`basis` has wrong shape.")
 
-                self.bravais_vectors = np.asarray(bravais_vectors)
-                if not self._check_shape(self.basis):
+                self._bravais_vectors = np.asarray(bravais_vectors)
+                if not self._check_shape(self._basis):
                     raise Exception("`bravais_vectors` has wrong shape.")
 
     def require_order(func):
@@ -87,7 +87,7 @@ class Spin_System:
 
         @wraps(func)
         def wrapper(self, *args, **kw):
-            if self.unordered:
+            if self._unordered:
                 raise Exception("This function requires on ordered system!")
             return func(self, *args, **kw)
 
@@ -107,16 +107,38 @@ class Spin_System:
     @property
     @require_order
     def n_cell_atoms(self):
-        return len(self.basis)
+        return len(self._basis)
+
+    @property
+    @require_order
+    def n_cells(self):
+        return self._n_cells
+
+    @property
+    @require_order
+    def bravais_vectors(self):
+        return self._bravais_vectors
+
+    @property
+    @require_order
+    def basis(self):
+        return self._basis
 
     @property
     def nos(self):
-        if self.unordered:
+        if self.is_flat():
             return len(self.spins)
         else:
             return (
-                self.n_cells[0] * self.n_cells[1] * self.n_cells[2] * self.n_cell_atoms
+                self._n_cells[0]
+                * self._n_cells[1]
+                * self._n_cells[2]
+                * self.n_cell_atoms
             )
+
+    @property
+    def unordered(self):
+        return self._unordered
 
     @require_order
     def idx(self, ib, a, b, c):
@@ -133,7 +155,7 @@ class Spin_System:
         """
 
         return int(
-            ib + self.n_cell_atoms * (a + self.n_cells[0] * (b + self.n_cells[1] * c))
+            ib + self.n_cell_atoms * (a + self._n_cells[0] * (b + self._n_cells[1] * c))
         )
 
     @require_order
@@ -148,7 +170,7 @@ class Spin_System:
         """
         idx_diff = idx
 
-        maxVal = np.array([self.n_cell_atoms, *self.n_cells])
+        maxVal = np.array([self.n_cell_atoms, *self._n_cells])
         tupel = [0, 0, 0, 0]
 
         div = np.prod(maxVal[:-1])
@@ -166,10 +188,10 @@ class Spin_System:
         """Make a shallow copy of spin_system"""
 
         # Need these field if not unordered
-        if not self.unordered:
-            _n_cells = np.array(self.n_cells)
-            _basis = np.array(self.basis)
-            _bravais_vectors = np.array(self.bravais_vectors)
+        if not self._unordered:
+            _n_cells = np.array(self._n_cells)
+            _basis = np.array(self._basis)
+            _bravais_vectors = np.array(self._bravais_vectors)
         else:
             _n_cells = None
             _basis = None
@@ -178,7 +200,7 @@ class Spin_System:
         copy = Spin_System(
             self.positions,
             self.spins,
-            self.unordered,
+            self._unordered,
             n_cells=_n_cells,
             basis=_basis,
             bravais_vectors=_bravais_vectors,
@@ -190,10 +212,10 @@ class Spin_System:
         """Make a deep copy of spin system"""
 
         # Need these field if not unordered
-        if not self.unordered:
-            _n_cells = np.array(self.n_cells)
-            _basis = np.array(self.basis)
-            _bravais_vectors = np.array(self.bravais_vectors)
+        if not self._unordered:
+            _n_cells = np.array(self._n_cells)
+            _basis = np.array(self._basis)
+            _bravais_vectors = np.array(self._bravais_vectors)
         else:
             _n_cells = None
             _basis = None
@@ -202,7 +224,7 @@ class Spin_System:
         copy = Spin_System(
             np.array(self.positions),
             np.array(self.spins),
-            self.unordered,
+            self._unordered,
             n_cells=_n_cells,
             basis=_basis,
             bravais_vectors=_bravais_vectors,
@@ -239,12 +261,24 @@ class Spin_System:
 
         self.positions = np.reshape(
             self.positions,
-            (self.n_cell_atoms, self.n_cells[0], self.n_cells[1], self.n_cells[2], 3),
+            (
+                self.n_cell_atoms,
+                self._n_cells[0],
+                self._n_cells[1],
+                self._n_cells[2],
+                3,
+            ),
             order="F",
         )
         self.spins = np.reshape(
             self.spins,
-            (self.n_cell_atoms, self.n_cells[0], self.n_cells[1], self.n_cells[2], 3),
+            (
+                self.n_cell_atoms,
+                self._n_cells[0],
+                self._n_cells[1],
+                self._n_cells[2],
+                3,
+            ),
             order="F",
         )
 
@@ -260,9 +294,9 @@ class Spin_System:
                 self.positions,
                 (
                     self.n_cell_atoms,
-                    self.n_cells[0],
-                    self.n_cells[1],
-                    self.n_cells[2],
+                    self._n_cells[0],
+                    self._n_cells[1],
+                    self._n_cells[2],
                     3,
                 ),
                 order="F",
@@ -271,9 +305,9 @@ class Spin_System:
                 self.spins,
                 (
                     self.n_cell_atoms,
-                    self.n_cells[0],
-                    self.n_cells[1],
-                    self.n_cells[2],
+                    self._n_cells[0],
+                    self._n_cells[1],
+                    self._n_cells[2],
                     3,
                 ),
                 order="F",
@@ -286,8 +320,8 @@ class Spin_System:
     @require_order
     def a_slice(self, val):
         result = self.shaped()[:, val, :, :, :]
-        result.n_cells = [1, self.n_cells[1], self.n_cells[2]]
-        result.bravais_vectors = self.bravais_vectors
+        result.n_cells = [1, self._n_cells[1], self._n_cells[2]]
+        result.bravais_vectors = self._bravais_vectors
         result.n_cell_atoms = self.n_cell_atoms
         result.unordered = False
         return result.flattened()
@@ -295,8 +329,8 @@ class Spin_System:
     @require_order
     def b_slice(self, val):
         result = self.shaped()[:, :, val, :, :]
-        result.n_cells = [self.n_cells[0], 1, self.n_cells[2]]
-        result.bravais_vectors = self.bravais_vectors
+        result.n_cells = [self._n_cells[0], 1, self._n_cells[2]]
+        result.bravais_vectors = self._bravais_vectors
         result.n_cell_atoms = self.n_cell_atoms
         result.unordered = False
         return result.flattened()
@@ -304,8 +338,8 @@ class Spin_System:
     @require_order
     def c_slice(self, val):
         result = self.shaped()[:, :, :, val, :]
-        result.n_cells = [self.n_cells[0], self.n_cells[1], 1]
-        result.bravais_vectors = self.bravais_vectors
+        result.n_cells = [self._n_cells[0], self._n_cells[1], 1]
+        result.bravais_vectors = self._bravais_vectors
         result.n_cell_atoms = self.n_cell_atoms
         result.unordered = False
         return result.flattened()
