@@ -162,7 +162,7 @@ class Spin_System:
         return self._unordered
 
     @require_order
-    def idx(self, ib, a, b, c):
+    def idx(self, ib, a, b, c, periodic=False):
         """Computes the linear idx from coords in the bravais lattice.
 
         Args:
@@ -174,6 +174,26 @@ class Spin_System:
         Returns:
             int: the linear index for the flattened spin/position arrays
         """
+
+        def check_bounds(var, name, lower, upper):
+            if var >= upper or var < 0:
+                raise Exception(
+                    "`{}` is {}, but has to lie within {} to {}".format(
+                        name, var, lower, upper - 1
+                    )
+                )
+
+        if not periodic:
+            check_bounds(ib, "ib", 0, self.n_cell_atoms)
+            check_bounds(a, "a", 0, self.n_cells[0])
+            check_bounds(b, "b", 0, self.n_cells[1])
+            check_bounds(c, "c", 0, self.n_cells[2])
+        else:
+            # Unlike C or C++, pythons modulo operator always returns numbers with the same sign as the denominator
+            ib = ib % self.n_cell_atoms
+            a = a % self.n_cells[0]
+            b = b % self.n_cells[1]
+            c = c % self.n_cells[2]
 
         return int(
             ib + self.n_cell_atoms * (a + self._n_cells[0] * (b + self._n_cells[1] * c))
@@ -189,6 +209,11 @@ class Spin_System:
         Returns:
             list(int,int,int,int): list of bravais indices [idx_cell_atom, a, b, c]
         """
+        if idx < 0 or idx >= self.nos:
+            raise Exception(
+                "`idx is {}, but has to lie within 0 and {}`".format(idx, self.nos - 1)
+            )
+
         idx_diff = idx
 
         maxVal = np.array([self.n_cell_atoms, *self._n_cells])

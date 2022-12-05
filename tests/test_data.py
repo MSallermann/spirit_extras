@@ -171,8 +171,49 @@ class Data_Test(unittest.TestCase):
 
             print(spin_system)
 
+    # def test_shorthand_constructors(self):
+    #     spin_system = data.Spin_System(positions=None, spins=[[2,2,2], [0,1,0]], n_cells=[1,1,1], n_cell_atoms=2, unordered=False)
+
+    def test_idx(self):
+        n_cells = [7, 3, 11]
+        basis = np.zeros(shape=(3, 3))
+        nos = np.prod(n_cells) * len(basis)
+        positions = np.empty(shape=(nos, 3))
+        spins = np.empty(shape=(nos, 3))
+
+        spin_system = data.Spin_System(
+            positions=positions,
+            spins=spins,
+            n_cells=n_cells,
+            basis=basis,
+            unordered=False,
+        )
+
+        for idx in range(spin_system.nos):
+            ib, a, b, c = spin_system.tupel(idx)
+            i = spin_system.idx(ib, a, b, c)
+
+            self.assertEqual(i, idx)
+
+            if idx == spin_system.nos - 1:
+                print(ib, a, b, c)
+
+        # Periodic
+        idx_per = spin_system.idx(2, 3, 2, spin_system.n_cells[2], periodic=True)
+        idx_exp = spin_system.idx(2, 3, 2, 0, periodic=False)
+        self.assertEqual(idx_per, idx_exp)
+
+        idx_per = spin_system.idx(2, 3, 2, -3, periodic=True)
+        idx_exp = spin_system.idx(2, 3, 2, spin_system.n_cells[2]-3, periodic=False)
+        self.assertEqual(idx_per, idx_exp)
+
+        idx_per = spin_system.idx(2, 3, -2, 7, periodic=True)
+        idx_exp = spin_system.idx(2, 3, 1, 7, periodic=False)
+        self.assertEqual(idx_per, idx_exp)
+
 
 if __name__ == "__main__":
     t = Data_Test()
     t.test_create_self()
     t.test_from_p_state()
+    t.test_idx()
