@@ -54,33 +54,40 @@ class Spin_System:
 
         # If the system has order we need the lattice information
         if not self._unordered:
-            for tmp in [n_cells, bravais_vectors]:
-                if tmp is None:
-                    raise Exception(
-                        "For an ordered system 'n_cells' and 'bravais_vectors' has to be provided"
+
+            # First we deal with n_cells
+            if n_cells is None:
+                raise Exception(
+                        "For an ordered system 'n_cells' has to be provided"
                     )
 
-                self._n_cells = np.asarray(n_cells)
-                if self._n_cells.shape != (3,):
+            self._n_cells = np.asarray(n_cells)
+            if self._n_cells.shape != (3,):
                     raise Exception(
                         "n_cells has wrong shape. It should be (3), but is {}".format(
                             self._n_cells.shape
                         )
                     )
 
-                if basis is None:
-                    self._basis = np.array(
-                        [[0, 0, 0]]
-                    )  # default for single basis systems
-                else:
-                    self._basis = np.asarray(basis)
+            # Deal with the basis, default is [[0,0,0]]
+            self._basis = basis
+            if self._basis is None:
+                self._basis = np.array(
+                    [[0, 0, 0]]
+                )  # default for single basis systems
+            else:
+                self._basis = np.asarray(basis)
+            if not self._check_shape(self._basis):
+                raise Exception("`basis` has wrong shape.")
 
-                if not self._check_shape(self._basis):
-                    raise Exception("`basis` has wrong shape.")
-
+            # Deal with the basis, default is simple cubic with lat. const 1 angs.
+            self._bravais_vectors = bravais_vectors
+            if self._bravais_vectors is None:
+                self._bravais_vectors = np.array( [[1,0,0],[0,1,0],[0,0,1]] )
+            else:
                 self._bravais_vectors = np.asarray(bravais_vectors)
-                if not self._check_shape(self._basis):
-                    raise Exception("`bravais_vectors` has wrong shape.")
+            if not self._check_shape(self._basis):
+                raise Exception("`bravais_vectors` has wrong shape.")
 
     def require_order(func):
         from functools import wraps
