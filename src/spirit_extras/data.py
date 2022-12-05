@@ -60,11 +60,11 @@ class Spin_System:
                         "For an ordered system 'n_cells' and 'bravais_vectors' has to be provided"
                     )
 
-                self.n_cells = np.asarray(n_cells)
-                if self.n_cells.shape != (3,):
+                self._n_cells = np.asarray(n_cells)
+                if self._n_cells.shape != (3,):
                     raise Exception(
                         "n_cells has wrong shape. It should be (3), but is {}".format(
-                            self.n_cells.shape
+                            self._n_cells.shape
                         )
                     )
 
@@ -112,7 +112,7 @@ class Spin_System:
     @property
     @require_order
     def n_cells(self):
-        return self.n_cells
+        return self._n_cells
 
     @property
     @require_order
@@ -152,7 +152,7 @@ class Spin_System:
         """
 
         return int(
-            ib + self.n_cell_atoms * (a + self.n_cells[0] * (b + self.n_cells[1] * c))
+            ib + self.n_cell_atoms * (a + self._n_cells[0] * (b + self._n_cells[1] * c))
         )
 
     @require_order
@@ -167,7 +167,7 @@ class Spin_System:
         """
         idx_diff = idx
 
-        maxVal = np.array([self.n_cell_atoms, *self.n_cells])
+        maxVal = np.array([self.n_cell_atoms, *self._n_cells])
         tupel = [0, 0, 0, 0]
 
         div = np.prod(maxVal[:-1])
@@ -186,11 +186,11 @@ class Spin_System:
 
         # Need these field if not unordered
         if not self._unordered:
-            n_cells = np.array(self.n_cells)
+            _n_cells = np.array(self._n_cells)
             _basis = np.array(self._basis)
             _bravais_vectors = np.array(self._bravais_vectors)
         else:
-            n_cells = None
+            _n_cells = None
             _basis = None
             _bravais_vectors = None
 
@@ -198,7 +198,7 @@ class Spin_System:
             self.positions,
             self.spins,
             self._unordered,
-            n_cells=n_cells,
+            n_cells=_n_cells,
             basis=_basis,
             bravais_vectors=_bravais_vectors,
         )
@@ -210,11 +210,11 @@ class Spin_System:
 
         # Need these field if not unordered
         if not self._unordered:
-            n_cells = np.array(self.n_cells)
+            _n_cells = np.array(self._n_cells)
             _basis = np.array(self._basis)
             _bravais_vectors = np.array(self._bravais_vectors)
         else:
-            n_cells = None
+            _n_cells = None
             _basis = None
             _bravais_vectors = None
 
@@ -222,7 +222,7 @@ class Spin_System:
             np.array(self.positions),
             np.array(self.spins),
             self._unordered,
-            n_cells=n_cells,
+            n_cells=_n_cells,
             basis=_basis,
             bravais_vectors=_bravais_vectors,
         )
@@ -390,8 +390,8 @@ def spin_system_from_p_state(p_state, idx_image=-1):
     # Query information from spirit state
     _positions = geometry.get_positions(p_state, idx_image=idx_image)
     _spins = system.get_spin_directions(p_state, idx_image=idx_image)
-    n_cells = geometry.getn_cells(p_state)
-    n_cell_atoms = geometry.getn_cell_atoms(p_state)
+    n_cells = geometry.get_n_cells(p_state)
+    n_cell_atoms = geometry.get_n_cell_atoms(p_state)
 
     _bravais_vectors, _basis = infer_lattice(n_cells, n_cell_atoms, _positions)
 
