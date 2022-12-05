@@ -69,6 +69,8 @@ class Data_Test(unittest.TestCase):
         system.flatten()
         system.flattened()
 
+        print(system)
+
     def test_from_p_state(self):
         INPUT_FILE = os.path.join(SCRIPT_DIR, "inputs/test_data.cfg")
 
@@ -166,6 +168,8 @@ class Data_Test(unittest.TestCase):
 
             print(spin_system.center())
             print(spin_system.flattened().center())
+
+            print(spin_system)
 
 
 if __name__ == "__main__":

@@ -107,6 +107,23 @@ class Spin_System:
         sliced_spin_system = Spin_System(self._positions[key], self.spins[key])
         return sliced_spin_system
 
+    def __str__(self):
+        result = f"nos       = {self.nos}\n"
+        result += f"unordered = {self.unordered}\n"
+        result += f"flat      = {self.is_flat()}\n"
+        result += (
+            f"positions = {type(self.positions)}, shape = {self.positions.shape}\n"
+        )
+        result += f"spins     = {type(self.spins)}, shape = {self.spins.shape}\n"
+
+        if not self.unordered:
+            result += f"n_cells         = {self.n_cells}\n"
+            result += f"n_cell_atoms    = {self.n_cell_atoms}\n"
+            result += f"bravais_vectors:\n{self.bravais_vectors}\n"
+            result += f"basis:\n{self.basis}\n"
+
+        return result
+
     @property
     def positions(self):
         return self._positions
