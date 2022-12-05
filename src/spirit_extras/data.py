@@ -10,80 +10,130 @@ class Spin_System:
         n_cells=None,
         basis=None,
         bravais_vectors=None,
+        n_cell_atoms=None,
     ):
-        self._positions = np.asarray(positions)
-        self.spins = np.asarray(spins)
+        self.spins = np.asarray(spins, dtype=float)
+        self._basis = basis
+        self._unordered = unordered
+        self._n_cells = n_cells
+        self._bravais_vectors = bravais_vectors
 
-        if self._positions.shape != self.spins.shape:
-            raise Exception("Positions and spins have different shapes")
+        if positions is None:
+            self._positions = np.zeros(
+                shape=self.spins.shape
+            )  # Sometimes the positions are not of interest, so we provide the option not to specify them
+        else:
+            self._positions = np.asarray(positions, dtype=float)
 
-        # Check the shapes of spins and positions
-        if not (
-            (len(self._positions.shape) == 2 or len(self._positions.shape) == 5)
-            and self._positions.shape[-1] == 3
-        ):
+        if basis is None:
+            if not n_cell_atoms is None:
+                self._basis = np.zeros(
+                    shape=(n_cell_atoms, 3)
+                )  # Same thing as above with positions
+
+        self.check_shape_of_spins_positions()
+
+        if not self.unordered:
+            self.checks_for_ordered_system()
+
+    def check_shape_of_spins_positions(self):
+        # Should have the same shape
+        if self.positions.shape != self.spins.shape:
             raise Exception(
-                "Spins and positions must either have shape (nos,3) or (n_cell_atoms, n_cells[0], n_cells[1], n_cells[2], 3), but they have shape {}".format(
-                    positions.shape
+                "Positions and spins have different shapes ... {} and {} respectively".format(
+                    self.positions.shape, self.spins.shape
                 )
             )
 
-        self._unordered = unordered
+        # Make sure the shape is of valid format
+        if (
+            not (len(self.positions.shape) == 2 or len(self.positions.shape) == 5)
+            and self.positions.shape[-1] == 3
+        ):
+            raise Exception(
+                "Spins and positions must either have shape (nos,3) or (n_cell_atoms, n_cells[0], n_cells[1], n_cells[2], 3), but they have shape {}".format(
+                    self.positions.shape
+                )
+            )
 
-        # If shaped positions and spins are given, we perform some consistency checks and try to infer n_cells, if not given
+        # If shaped positions and spins are given, we perform some consistency checks and try to infer n_cells, if it was not given
         if self.is_shaped():
             if self._unordered:
                 raise Exception(
                     "Only arrays of shape (nos,3) can be used when unordered=True"
                 )
 
-            # Check if n_cells is consistent with the shape of the spin arrays
-            if not n_cells is None:
-                if self._positions.shape[1:-1] != (n_cells[0], n_cells[1], n_cells[2]):
-                    raise Exception("Shape of positions/spins does not match n_cells")
-            else:
-                n_cells = np.array(self._positions.shape[1:-1])
-
-            # Check if basis is consistent with the shape of the spin arrays
-            # (Theoretically we could infer the basis as well)
-            if not basis is None:
-                if self._positions.shape[0] != len(basis):
+            if not self._n_cells is None:
+                if self.positions.shape[1:-1] != (
+                    self.n_cells[0],
+                    self.n_cells[1],
+                    self.n_cells[2],
+                ):
                     raise Exception(
-                        "Shape of positions/spins does not match length of basis"
+                        "Shape of positions/spins {} does not match n_cells {}".format(
+                            self.positions.shape, self._n_cells
+                        )
                     )
+            else:
+                self._n_cells = np.array(self.positions.shape[1:-1])
 
-        # If the system has order we need the lattice information
-        if not self._unordered:
-
-            # First we deal with n_cells
-            if n_cells is None:
-                raise Exception("For an ordered system 'n_cells' has to be provided")
-
-            self._n_cells = np.asarray(n_cells)
-            if self._n_cells.shape != (3,):
-                raise Exception(
-                    "n_cells has wrong shape. It should be (3), but is {}".format(
-                        self._n_cells.shape
+            if not self._basis is None:
+                if self._positions.shape[0] != len(self._basis):
+                    raise Exception(
+                        "Shape of positions/spins {} does not match length of basis {}".format(
+                            self.positions.shape, len(self.basis)
+                        )
                     )
+            else:
+                self._basis = np.zeros(
+                    shape=(self.positions.shape[0], 3)
+                )  # Dummy basis
+
+    def checks_for_ordered_system(self):
+        if self.n_cells is None:
+            raise Exception("For an ordered system 'n_cells' must be provided")
+        else:
+            self._n_cells = np.asarray(self.n_cells, dtype=int)
+
+        if self._n_cells.shape != (3,):
+            raise Exception(
+                "n_cells has wrong shape. It should be (3), but is {}".format(
+                    self._n_cells.shape
                 )
+            )
 
-            # Deal with the basis, default is [[0,0,0]]
-            self._basis = basis
-            if self._basis is None:
-                self._basis = np.array([[0, 0, 0]])  # default for single basis systems
-            else:
-                self._basis = np.asarray(basis)
-            if not self._check_shape(self._basis):
-                raise Exception("`basis` has wrong shape.")
+        # basis
+        if self._basis is None:
+            self._basis = np.array([[0, 0, 0]])  # default for single basis systems
+        else:
+            self._basis = np.asarray(self._basis, dtype=float)
+        if not len(self.basis.shape) == 2 or not self.basis.shape[-1] == 3:
+            raise Exception(
+                "`basis` has wrong shape. It should have shape (n_cell_atoms, 3), but has shape {}".format(
+                    self.basis.shape
+                )
+            )
 
-            # Deal with the basis, default is simple cubic with lat. const 1 angs.
-            self._bravais_vectors = bravais_vectors
-            if self._bravais_vectors is None:
-                self._bravais_vectors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-            else:
-                self._bravais_vectors = np.asarray(bravais_vectors)
-            if not self._check_shape(self._basis):
-                raise Exception("`bravais_vectors` has wrong shape.")
+        # bravais vectors
+        if self._bravais_vectors is None:
+            self._bravais_vectors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        else:
+            self._bravais_vectors = np.asarray(self._bravais_vectors, dtype=float)
+        if not self.bravais_vectors.shape == (3, 3):
+            raise Exception(
+                "`bravais_vectors` has wrong shape. It should have shape (3, 3), but has shape {}".format(
+                    self.bravais_vectors.shape
+                )
+            )
+
+        # nos
+        nos_expected = np.prod(self.n_cells) * self.n_cell_atoms
+        if nos_expected != self.nos:
+            raise Exception(
+                "NOS from n_cells/n_cell_atoms ({}) does not match spin arrays ({})".format(
+                    nos_expected, self.nos
+                )
+            )
 
     def require_order(func):
         from functools import wraps
@@ -95,13 +145,6 @@ class Spin_System:
             return func(self, *args, **kw)
 
         return wrapper
-
-    def _check_shape(self, arr):
-        if len(arr) == 0 or len(arr) == 1:
-            return True
-        if len(arr.shape) != 2 or arr.shape[-1] != 3:
-            return False
-        return True
 
     def __getitem__(self, key):
         sliced_spin_system = Spin_System(self._positions[key], self.spins[key])
