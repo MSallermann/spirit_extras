@@ -11,16 +11,16 @@ class Spin_System:
         basis=None,
         bravais_vectors=None,
     ):
-        self.positions = np.asarray(positions)
+        self._positions = np.asarray(positions)
         self.spins = np.asarray(spins)
 
-        if self.positions.shape != self.spins.shape:
+        if self._positions.shape != self.spins.shape:
             raise Exception("Positions and spins have different shapes")
 
         # Check the shapes of spins and positions
         if not (
-            (len(self.positions.shape) == 2 or len(self.positions.shape) == 5)
-            and self.positions.shape[-1] == 3
+            (len(self._positions.shape) == 2 or len(self._positions.shape) == 5)
+            and self._positions.shape[-1] == 3
         ):
             raise Exception(
                 "Spins and positions must either have shape (nos,3) or (n_cell_atoms, n_cells[0], n_cells[1], n_cells[2], 3), but they have shape {}".format(
@@ -39,15 +39,15 @@ class Spin_System:
 
             # Check if n_cells is consistent with the shape of the spin arrays
             if not n_cells is None:
-                if self.positions.shape[1:-1] != (n_cells[0], n_cells[1], n_cells[2]):
+                if self._positions.shape[1:-1] != (n_cells[0], n_cells[1], n_cells[2]):
                     raise Exception("Shape of positions/spins does not match n_cells")
             else:
-                n_cells = np.array(self.positions.shape[1:-1])
+                n_cells = np.array(self._positions.shape[1:-1])
 
             # Check if basis is consistent with the shape of the spin arrays
             # (Theoretically we could infer the basis as well)
             if not basis is None:
-                if self.positions.shape[0] != len(basis):
+                if self._positions.shape[0] != len(basis):
                     raise Exception(
                         "Shape of positions/spins does not match length of basis"
                     )
@@ -57,24 +57,20 @@ class Spin_System:
 
             # First we deal with n_cells
             if n_cells is None:
-                raise Exception(
-                        "For an ordered system 'n_cells' has to be provided"
-                    )
+                raise Exception("For an ordered system 'n_cells' has to be provided")
 
             self._n_cells = np.asarray(n_cells)
             if self._n_cells.shape != (3,):
-                    raise Exception(
-                        "n_cells has wrong shape. It should be (3), but is {}".format(
-                            self._n_cells.shape
-                        )
+                raise Exception(
+                    "n_cells has wrong shape. It should be (3), but is {}".format(
+                        self._n_cells.shape
                     )
+                )
 
             # Deal with the basis, default is [[0,0,0]]
             self._basis = basis
             if self._basis is None:
-                self._basis = np.array(
-                    [[0, 0, 0]]
-                )  # default for single basis systems
+                self._basis = np.array([[0, 0, 0]])  # default for single basis systems
             else:
                 self._basis = np.asarray(basis)
             if not self._check_shape(self._basis):
@@ -83,7 +79,7 @@ class Spin_System:
             # Deal with the basis, default is simple cubic with lat. const 1 angs.
             self._bravais_vectors = bravais_vectors
             if self._bravais_vectors is None:
-                self._bravais_vectors = np.array( [[1,0,0],[0,1,0],[0,0,1]] )
+                self._bravais_vectors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
             else:
                 self._bravais_vectors = np.asarray(bravais_vectors)
             if not self._check_shape(self._basis):
@@ -108,8 +104,12 @@ class Spin_System:
         return True
 
     def __getitem__(self, key):
-        sliced_spin_system = Spin_System(self.positions[key], self.spins[key])
+        sliced_spin_system = Spin_System(self._positions[key], self.spins[key])
         return sliced_spin_system
+
+    @property
+    def positions(self):
+        return self._positions
 
     @property
     @require_order
@@ -202,7 +202,7 @@ class Spin_System:
             _bravais_vectors = None
 
         copy = Spin_System(
-            self.positions,
+            self._positions,
             self.spins,
             self._unordered,
             n_cells=_n_cells,
@@ -226,7 +226,7 @@ class Spin_System:
             _bravais_vectors = None
 
         copy = Spin_System(
-            np.array(self.positions),
+            np.array(self._positions),
             np.array(self.spins),
             self._unordered,
             n_cells=_n_cells,
@@ -238,7 +238,7 @@ class Spin_System:
 
     def is_flat(self):
         """Return true if spin_system is flat"""
-        return len(self.positions.shape) == 2
+        return len(self._positions.shape) == 2
 
     def is_shaped(self):
         """Return true if spin_system is flat"""
@@ -246,7 +246,7 @@ class Spin_System:
 
     def flatten(self):
         """Flatten the spin system"""
-        self.positions = np.reshape(self.positions, (self.nos, 3), order="F")
+        self._positions = np.reshape(self._positions, (self.nos, 3), order="F")
         self.spins = np.reshape(self.spins, (self.nos, 3), order="F")
 
     def flattened(self):
@@ -255,7 +255,7 @@ class Spin_System:
             return self
         else:
             temp = self.copy()
-            temp.positions = np.reshape(self.positions, (self.nos, 3), order="F")
+            temp._positions = np.reshape(self._positions, (self.nos, 3), order="F")
             temp.spins = np.reshape(self.spins, (self.nos, 3), order="F")
             return temp
 
@@ -263,8 +263,8 @@ class Spin_System:
     def shape(self):
         """Shape the spin system"""
 
-        self.positions = np.reshape(
-            self.positions,
+        self._positions = np.reshape(
+            self._positions,
             (
                 self.n_cell_atoms,
                 self.n_cells[0],
@@ -294,8 +294,8 @@ class Spin_System:
             return self
         else:
             temp = self.copy()
-            temp.positions = np.reshape(
-                self.positions,
+            temp._positions = np.reshape(
+                self._positions,
                 (
                     self.n_cell_atoms,
                     self.n_cells[0],
