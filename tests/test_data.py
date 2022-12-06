@@ -85,14 +85,26 @@ class Data_Test(unittest.TestCase):
         bravais_check = lattice_constant_input * bravais_input
         basis_check = np.matmul(basis_input, bravais_check)
 
-        from spirit import state, configuration, system
+        from spirit import state, configuration, system, chain
 
         with state.State(INPUT_FILE, quiet=True) as p_state:
+            NOI = 10
+            IDX_IMAGE = 5
 
-            spins = system.get_spin_directions(p_state)
+            chain.image_to_clipboard(p_state)
+            chain.set_length(p_state, NOI)
 
-            configuration.plus_z(p_state)  # set +z configuration
-            spin_system = data.spin_system_from_p_state(p_state)
+            for i in range(NOI):
+                configuration.domain(
+                    p_state, [1, 1, 1], idx_image=i
+                )  # set [1,1,1] configuration
+
+            configuration.plus_z(p_state, idx_image=IDX_IMAGE)
+            spins = system.get_spin_directions(p_state, idx_image=IDX_IMAGE)
+
+            spin_system = data.spin_system_from_p_state(p_state, idx_image=IDX_IMAGE)
+
+            self.assertTrue(np.all(spin_system.spins[0] == [0, 0, 1]))
 
             # Check for n_cells, n_cell_atoms and nos
             self.assertEqual(spin_system.nos, np.prod(n_cells_input) * len(basis_input))
