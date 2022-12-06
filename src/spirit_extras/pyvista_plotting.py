@@ -1,5 +1,10 @@
-from .plotting import get_rgba_colors
+from .plotting import (
+    get_rgba_colors,
+    get_rgba_colors_red_blue,
+    get_rgba_colors_red_green_blue,
+)
 import numpy as np
+import os
 
 
 def create_point_cloud(spin_system):
@@ -108,7 +113,7 @@ def save_to_png(image_file_name, mesh_list):
     plotter.set_background("white")
     plotter.add_axes(color="black", line_width=6)
 
-    plotter.show(screenshot=image_file_name + ".png")
+    plotter.show(screenshot=file_name + ".png")
 
 
 def plot_color_sphere(image_file_name, spin_to_rgba_func):
@@ -189,6 +194,26 @@ import pyvista as pv
 
 
 class Spin_Plotter:
+
+    __slots__ = [
+        "spin_system",
+        "_point_cloud",
+        "_delaunay",
+        "background_color",
+        "axes",
+        "meshlist",
+        "resolution",
+        "camera_position",
+        "camera_up",
+        "camera_focal_point",
+        "camera_azimuth",
+        "camera_elevation",
+        "camera_distance",
+        "camera_view_angle",
+        "_preimages",
+        "default_render_args",
+    ]
+
     def __init__(self, system):
         self.spin_system = system
 
@@ -224,6 +249,8 @@ class Spin_Plotter:
         )
 
     def camera_from_json(self, save_camera_file):
+        import json
+
         with open(save_camera_file, "r") as f:
             data = json.load(f)
         self.camera_position = data["position"]
@@ -231,6 +258,42 @@ class Spin_Plotter:
         self.camera_focal_point = data["focal_point"]
         self.camera_distance = data["distance"]
         self.camera_view_angle = data["view_angle"]
+
+    def _string_to_direction(self, input):
+        """Converts strings like "+X-Z" to normalized directions, here 1/sqrt(2)[1,0,-1]
+        Args:
+            input (str): the string to be parsed
+        """
+        input = input.lower()
+
+        res = np.zeros(3)
+
+        for name, direction in [["x", [1, 0, 0]], ["y", [0, 1, 0]], ["z", [0, 0, 1]]]:
+            idx = input.find(name)
+            if idx == 0:
+                res += np.array(direction, dtype=float)
+            elif idx > 0:
+                if input[idx - 1] == "+":
+                    res += np.array(direction, dtype=float)
+                elif input[idx - 1] == "-":
+                    res -= np.array(direction, dtype=float)
+                else:
+                    res += np.array(direction, dtype=float)
+
+        res = res / np.linalg.norm(res)
+        return res
+
+    def camera_focus(self, distance=80, direction="X", view_angle=None):
+        if type(direction) is str:
+            direction = self._string_to_direction(direction)
+
+        direction /= np.linalg.norm(direction)
+
+        self.camera_focal_point = self.spin_system.center()
+        self.camera_view_angle = view_angle
+        self.camera_position = self.camera_focal_point + distance * direction
+
+        # self.camera_focal_point = self.spin_system.center()
 
     def rotate_camera(self, axis, angle):
         from scipy.spatial.transform import Rotation
@@ -269,7 +332,7 @@ class Spin_Plotter:
         )
         self.camera_up /= np.linalg.norm(self.camera_up)
 
-    def set_camera(self, plotter):
+    def _set_camera(self, plotter):
         if not self.camera_position is None:
             plotter.camera.position = self.camera_position
         if not self.camera_azimuth is None:
@@ -307,9 +370,26 @@ class Spin_Plotter:
         if self._delaunay:
             self._delaunay.copy_attributes(self._point_cloud)
 
+    def colormap(self, colormap):
+
+        if type(colormap) is str:
+            if colormap.lower() == "hsv":
+                colormap = lambda spins: get_rgba_colors(spins, opacity=1.0)
+            elif colormap.lower() == "rb":
+                colormap = lambda spins: get_rgba_colors_red_blue(spins, opacity=1.0)
+            elif colormap.lower() == "rgb":
+                colormap = lambda spins: get_rgba_colors_red_green_blue(
+                    spins, opacity=1.0
+                )
+
+        self._point_cloud["spins_rgba"] = colormap(self.spin_system.spins)
+
     def add_mesh(self, mesh, render_args):
         self.meshlist.append([mesh, render_args])
         return self.meshlist[-1]
+
+    def clear_meshes(self):
+        self.meshlist = []
 
     def isosurface(self, isovalue, scalars_key, render_args=None):
         if not self._delaunay:
@@ -374,7 +454,7 @@ class Spin_Plotter:
         plotter = pv.Plotter(shape=(1, 1))
         plotter.window_size = self.resolution
 
-        self.set_camera(plotter)
+        self._set_camera(plotter)
 
         for m, args in self.meshlist:
             try:
@@ -408,10 +488,14 @@ class Spin_Plotter:
         plotter.close()
 
     def render_to_png(self, png_path):
+        file_name, ext = os.path.splitext(png_path)
+        if not (len(ext) == 0 or ext.lower() == ".png"):
+            raise Exception("File extension must be either '.png' or not specified")
+
         pv.start_xvfb()
         plotter = pv.Plotter(off_screen=True, shape=(1, 1), multi_samples=8)
         plotter.window_size = self.resolution
-        self.set_camera(plotter)
+        self._set_camera(plotter)
 
         for m, args in self.meshlist:
             try:
@@ -431,6 +515,6 @@ class Spin_Plotter:
                 plotter.set_background(self.background_color)
 
         plotter.screenshot(
-            png_path + ".png", transparent_background=transparent_background
+            file_name + ".png", transparent_background=transparent_background
         )
         plotter.close()
