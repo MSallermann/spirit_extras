@@ -21,6 +21,8 @@ class Dependency_Gatherer_Test(unittest.TestCase):
         for file in FILES:
             self.generate_file(file)
 
+        self.generate_file(os.path.join(FOLDER, "multiple_4.txt"))
+
         return super().setUp()
 
     def tearDown(self) -> None:
@@ -46,6 +48,34 @@ class Dependency_Gatherer_Test(unittest.TestCase):
         D.generate(
             os.path.join(FOLDER, "generate.txt"),
             lambda: self.generate_file(os.path.join(FOLDER, "generate.txt")),
+        )
+        D.check()
+
+    def test_create_multiple(self):
+        D = dependency_gatherer.Dependency_Gatherer(verbose=True)
+        for f in FILES:
+            D.depends(f)
+
+        D.depends(__file__)
+
+        def create_multiple():
+            # print("\n\nCB multiple\n\n")
+            self.generate_file(os.path.join(FOLDER, "multiple_1.txt"))
+            self.generate_file(os.path.join(FOLDER, "multiple_2.txt"))
+            self.generate_file(os.path.join(FOLDER, "multiple_3.txt"))
+            self.generate_file(os.path.join(FOLDER, "multiple_4.txt"))
+
+        D.depends(
+            [
+                os.path.join(FOLDER, p)
+                for p in [
+                    "multiple_1.txt",
+                    "multiple_2.txt",
+                    "multiple_3.txt",
+                    "multiple_4.txt",
+                ]
+            ],
+            create_multiple,
         )
         D.check()
 
