@@ -66,8 +66,3 @@ class Paper_Plot_Test(unittest.TestCase):
         pplot.image_to_ax(ax_img, image_crop)
 
         fig.savefig(os.path.join(self.SCRIPT_DIR, "test_fig.png"), dpi=300)
-
-
-if __name__ == "__main__":
-    test = Calculation_Folder_Test()
-    test.test()
