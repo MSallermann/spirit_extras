@@ -228,9 +228,132 @@ class Data_Test(unittest.TestCase):
         idx_exp = spin_system.idx(2, 3, 1, 7, periodic=False)
         self.assertEqual(idx_per, idx_exp)
 
+    def test_failures(self):
+        positions = np.array([[0, 0, 0] for i in range(300)])
+        spins = np.array([[0, 0, 1] for i in range(300)])
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because n_cell_atoms length four instead of three
+            spin_system = data.Spin_System(
+                positions=None,
+                spins=spins,
+                n_cells=[10, 1, 10],
+                n_cell_atoms=4,
+                unordered=False,
+            )
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because basis has length one instead of three
+            spin_system = data.Spin_System(
+                positions=None,
+                spins=spins,
+                n_cells=[10, 1, 10],
+                basis=[[0, 0, 2]],
+                unordered=False,
+            )
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because shape of spins is incorrect
+            spin_system = data.Spin_System(
+                positions=None,
+                spins=[spins],
+                n_cells=[10, 1, 10],
+                basis=[[0, 0, 2]],
+                unordered=False,
+            )
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because shape of bravais_vectors is wrong
+            spin_system = data.Spin_System(
+                positions=None,
+                spins=spins,
+                n_cells=[10, 1, 10],
+                n_cell_atoms=3,
+                unordered=False,
+                bravais_vectors=[[0, 1, 0], [2, 3, 3]],
+            )
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because system is ordered and n_cells is missing
+            spin_system = data.Spin_System(positions=None, spins=spins, unordered=False)
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because shape of positions and spins is different
+            spin_system = data.Spin_System(
+                positions=[[0, 0, 0], [0, 0, 0]],
+                spins=spins,
+            )
+
+        # Now test with shaped arrays
+        positions_shape = np.reshape(positions, (3, 10, 1, 10, 3))
+        spins_shape = np.reshape(spins, (3, 10, 1, 10, 3))
+        with self.assertRaises(Exception) as _:
+            # Should fail because unordered=False
+            spin_system = data.Spin_System(
+                positions=positions_shape,
+                spins=spins_shape,
+            )
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because n_cell_atoms is fifteen instead of three
+            spin_system = data.Spin_System(
+                positions=positions_shape,
+                spins=spins_shape,
+                n_cell_atoms=15,
+                unordered=False,
+            )
+
+        with self.assertRaises(Exception) as _:
+            # Should fail because n_cells is [2,2,2] instead of [10,1,10]
+            spin_system = data.Spin_System(
+                positions=positions_shape,
+                spins=spins_shape,
+                n_cells=[2, 2, 2],
+                unordered=False,
+            )
+
+        ## Now test some idx functions
+        with self.assertRaises(Exception) as _:
+            spin_system = data.Spin_System(
+                positions=positions,
+                spins=spins,
+            )
+            # Should fail because system is not ordered
+            spin_system.idx(0, 0, 0, 0)
+
+        with self.assertRaises(Exception) as _:
+            spin_system = data.Spin_System(
+                positions=positions_shape, spins=spins_shape, unordered=False
+            )
+            # Should fail because system c is out of bounds and periodic=False
+            spin_system.idx(0, 0, 0, -1)
+
+        with self.assertRaises(Exception) as _:
+            spin_system = data.Spin_System(
+                positions=positions_shape, spins=spins_shape, unordered=False
+            )
+            # Should fail because system c is out of bounds and periodic=False
+            spin_system.idx(0, 0, 0, spin_system.n_cells[2] + 2)
+
+        with self.assertRaises(Exception) as _:
+            spin_system = data.Spin_System(
+                positions=positions_shape, spins=spins_shape, unordered=False
+            )
+            # Should fail because system idx is out of bounds
+            spin_system.tupel(spin_system.nos)
+
+        with self.assertRaises(Exception) as _:
+            spin_system = data.Spin_System(
+                positions=positions,
+                spins=spins,
+            )
+            # Should fail because system is unordered
+            spin_system.shape()
+
 
 if __name__ == "__main__":
     t = Data_Test()
     t.test_create_self()
     t.test_from_p_state()
     t.test_idx()
+    t.test_failures()
