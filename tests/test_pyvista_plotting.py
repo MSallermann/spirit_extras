@@ -27,10 +27,10 @@ class Pyvista_Plotting_Test(unittest.TestCase):
             spin_system = data.spin_system_from_p_state(p_state).deepcopy()
 
         plotter = Spin_Plotter(spin_system)
+        plotter.axes = True
         plotter.resolution = (420, 420)  # low res so test is faster
 
         plotter.arrows()
-
         plotter.render_to_png(
             os.path.join(
                 os.path.join(self.PLOT_OUTPUTS, "cones_with_white_background.png")
@@ -51,9 +51,7 @@ class Pyvista_Plotting_Test(unittest.TestCase):
             )
         )
 
-        plotter.axes = True
-        plotter.camera_focal_point = spin_system.center()
-        plotter.camera_focus(distance=120, direction="XYZ")
+        plotter.set_camera_focus(distance=200, direction="XYZ")
         plotter.render_to_png(
             os.path.join(os.path.join(self.PLOT_OUTPUTS, "cones_with_camera_focus.png"))
         )
@@ -63,4 +61,11 @@ class Pyvista_Plotting_Test(unittest.TestCase):
         plotter.arrows()
         plotter.render_to_png(
             os.path.join(os.path.join(self.PLOT_OUTPUTS, "cones_colormap_rgb.png"))
+        )
+
+        plotter.colormap("rb", cardinal=np.array([1, 0, 0]))
+        plotter.clear_meshes()
+        plotter.arrows()
+        plotter.render_to_png(
+            os.path.join(os.path.join(self.PLOT_OUTPUTS, "cones_colormap_rb_x.png"))
         )

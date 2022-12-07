@@ -5,6 +5,7 @@ from .plotting import (
 )
 import numpy as np
 import os
+import json
 
 
 def create_point_cloud(spin_system):
@@ -249,8 +250,6 @@ class Spin_Plotter:
         )
 
     def camera_from_json(self, save_camera_file):
-        import json
-
         with open(save_camera_file, "r") as f:
             data = json.load(f)
         self.camera_position = data["position"]
@@ -283,15 +282,15 @@ class Spin_Plotter:
         res = res / np.linalg.norm(res)
         return res
 
-    def camera_focus(self, distance=80, direction="X", view_angle=None):
+    def set_camera_focus(self, distance=80, direction="X", view_angle=None):
         if type(direction) is str:
             direction = self._string_to_direction(direction)
 
         direction /= np.linalg.norm(direction)
 
-        self.camera_focal_point = self.spin_system.center()
         self.camera_view_angle = view_angle
-        self.camera_position = self.camera_focal_point + distance * direction
+        self.camera_position = self.spin_system.center() + distance * direction
+        self.camera_focal_point = self.spin_system.center() - 2 * distance * direction
 
         # self.camera_focal_point = self.spin_system.center()
 
@@ -347,6 +346,7 @@ class Spin_Plotter:
             plotter.camera.distance = self.camera_distance
         if not self.camera_view_angle is None:
             plotter.camera.view_angle = self.camera_view_angle
+        # plotter.camera_set = True
 
     def compute_delaunay(self):
         self._delaunay = delaunay(self._point_cloud)
@@ -370,16 +370,18 @@ class Spin_Plotter:
         if self._delaunay:
             self._delaunay.copy_attributes(self._point_cloud)
 
-    def colormap(self, colormap):
+    def colormap(self, colormap, opacity=1.0, **kwargs):
 
         if type(colormap) is str:
             if colormap.lower() == "hsv":
-                colormap = lambda spins: get_rgba_colors(spins, opacity=1.0)
+                colormap = lambda spins: get_rgba_colors(spins, opacity, **kwargs)
             elif colormap.lower() == "rb":
-                colormap = lambda spins: get_rgba_colors_red_blue(spins, opacity=1.0)
+                colormap = lambda spins: get_rgba_colors_red_blue(
+                    spins, opacity, **kwargs
+                )
             elif colormap.lower() == "rgb":
                 colormap = lambda spins: get_rgba_colors_red_green_blue(
-                    spins, opacity=1.0
+                    spins, opacity, **kwargs
                 )
 
         self._point_cloud["spins_rgba"] = colormap(self.spin_system.spins)
