@@ -1,4 +1,4 @@
-import json, os, pprint, shutil
+import json, os, pprint, shutil, yaml
 
 
 class Calculation_Folder(os.PathLike, dict):
@@ -6,6 +6,15 @@ class Calculation_Folder(os.PathLike, dict):
 
     def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
         self.output_folder = os.path.normpath(os.path.abspath(output_folder))
+        if not os.path.isdir(self.output_folder):
+            if not create:
+                raise Exception(
+                    f"Directory {self.output_folder} either does not exist or is a file that is not a directory. Call constructor with 'create=True' to create it."
+                )
+            else:
+                os.makedirs(self.output_folder)
+
+        self._lock_file = "~lock"
 
         # We enforce that the descriptor file is at the root of the output folder
         if (
@@ -16,19 +25,24 @@ class Calculation_Folder(os.PathLike, dict):
                 "The descriptor file has to be at the root of the calculation folder!"
             )
 
+        # Deal with the type of the descriptor file
         self._descriptor_file_name = os.path.normpath(descriptor_file)
+        self._descriptor_file_name_base, self._descriptor_file_ext = os.path.splitext(
+            self._descriptor_file_name
+        )
 
-        self._lock_file = "~lock"
+        if self._descriptor_file_ext == ".json":
+            self.use_json = True
+        elif (
+            self._descriptor_file_ext == ".yml" or self._descriptor_file_ext == ".yaml"
+        ):
+            self.use_json = False
+        else:
+            raise Exception(
+                "Only `.yaml`, `.yml` and `.json` are supported as descriptor file endings"
+            )
 
-        if not os.path.isdir(self.output_folder):
-            if not create:
-                raise Exception(
-                    f"Directory {self.output_folder} either does not exist or is a file that is not a directory. Call constructor with 'create=True' to create it."
-                )
-            else:
-                os.makedirs(self.output_folder)
-
-        self.from_json()
+        self.from_desc()
 
     def __str__(self):
         return str(self.output_folder)
@@ -64,17 +78,69 @@ class Calculation_Folder(os.PathLike, dict):
         res += pprint.pformat(self)
         return res
 
+    def from_yaml(self):
+        if os.path.exists(self.to_abspath(self._descriptor_file_name)):
+            with open(self.to_abspath(self._descriptor_file_name), "r") as f:
+                super().__init__(yaml.safe_load(f))
+
+    def from_desc(self):
+        if self.use_json:
+            self.from_json()
+        else:
+            self.from_yaml()
+
+    def to_desc(self):
+        if self.use_json:
+            self.to_json()
+        else:
+            self.to_yaml()
+
+    def to_yaml(self, output_file=None):
+        if output_file is None:
+            output_file = self._descriptor_file_name
+
+        descriptor_file = self.to_abspath(output_file)
+        file, ext = os.path.splitext(output_file)
+
+        # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
+        temporary_file = self.to_abspath(file + "__temp__" + ext)
+
+        if ext != ".yml" and ext != ".yaml":
+            raise Exception("File extension has to be `.yml` or `.yaml`")
+
+        try:
+            with open(temporary_file, "w") as f:
+                f.write(yaml.dump(dict(self)))
+                # If json serialization has succeeded, we can remove the old json file and rename the temporary accordingly
+                if os.path.exists(descriptor_file):
+                    os.remove(descriptor_file)
+                os.rename(temporary_file, descriptor_file)
+        except Exception as e:
+            print("JSON serialization has encountered an error.")
+            print(f"The original file '{descriptor_file}' has not been changed.")
+            # We delete the temporary file, if it exists
+            if os.path.exists(temporary_file):
+                os.remove(temporary_file)
+            raise e
+
     def from_json(self):
         if os.path.exists(self.to_abspath(self._descriptor_file_name)):
             with open(self.to_abspath(self._descriptor_file_name), "r") as f:
                 super().__init__(json.load(f))
 
-    def to_json(self):
+    def to_json(self, output_file=None):
         descriptor_file = self.to_abspath(self._descriptor_file_name)
-        file, ext = os.path.splitext(self._descriptor_file_name)
+        if output_file is None:
+            output_file = self._descriptor_file_name
+
+        descriptor_file = self.to_abspath(output_file)
+        file, ext = os.path.splitext(output_file)
 
         # For safety reasons we first write to a temporary file, the main reason is that open(..., "w") will immediately truncate the descriptor file
         temporary_file = self.to_abspath(file + "__temp__" + ext)
+
+        if ext != ".json":
+            raise Exception("File extension has to be `.json`")
 
         try:
             with open(temporary_file, "w") as f:
