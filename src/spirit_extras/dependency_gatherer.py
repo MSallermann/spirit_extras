@@ -47,23 +47,24 @@ class Dependency_Gatherer:
         return res_string
 
     def print(self, msg, color=None, text_highlights=None, indent=0):
-        if self.verbose:
-            if color is None:
-                print(indent * " " + msg)
-            else:
-                cprint(indent * " " + msg, color, text_highlights)
+        if color is None:
+            print(indent * " " + msg)
+        else:
+            cprint(indent * " " + msg, color, text_highlights)
 
     def print_err(self, msg, indent=8):
         self.print(msg, "red", indent=indent)
 
     def print_success(self, msg, indent=8):
-        self.print(msg, "green", indent=indent)
+        if self.verbose:
+            self.print(msg, "green", indent=indent)
 
     def print_warning(self, msg, indent=8):
         self.print(msg, "yellow", indent=indent)
 
     def print_info(self, msg, indent=8):
-        self.print(msg, indent=indent)
+        if self.verbose:
+            self.print(msg, indent=indent)
 
     def __check_path(self, path):
         """Check if path"""
