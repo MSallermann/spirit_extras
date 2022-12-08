@@ -74,7 +74,7 @@ class Dependency_Gatherer:
             return False
         return True
 
-    def depends(self, abs_path_to_file, cb_function=None):
+    def depends(self, abs_path_to_file, cb_function=None, always_generate=False):
         """Adds a dependency. If the file is not found it can optionally be created by a callback function.
         Args:
             abs_path_to_file (list of paths (list of str) or single path): Paths to the dependencies.
@@ -86,7 +86,7 @@ class Dependency_Gatherer:
         if self.__check_path(abs_path_to_file):
             abs_path_to_file = [abs_path_to_file]
 
-        self._dependencies.append([abs_path_to_file, cb_function, False])
+        self._dependencies.append([abs_path_to_file, cb_function, always_generate])
         return self
 
     def generate(self, abs_path_to_file, cb_function):
@@ -99,11 +99,7 @@ class Dependency_Gatherer:
         Returns:
             Dependcy_Gatherer: self
         """
-        if self.__check_path(abs_path_to_file):
-            abs_path_to_file = [abs_path_to_file]
-
-        self._dependencies.append([abs_path_to_file, cb_function, True])
-        return self
+        return self.depends(abs_path_to_file, cb_function)
 
     def check(self):
         self.print_info("Running checks...", indent=0)
