@@ -76,9 +76,18 @@ class GNEB_Node(NodeMixin):
         self._converged = False
 
         # Create output folder
+        self.output_folder = output_folder
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
-        self.output_folder = output_folder
+
+        # If no log file has been specified we put one in the output folder
+        if not gneb_workflow_log_file:
+            self.gneb_workflow_log_file = os.path.join(
+                self.output_folder, "workflow_log.txt"
+            )
+        else:
+            self.gneb_workflow_log_file = gneb_workflow_log_file
+        self.log(f"Created output folder `{self.output_folder}`")
 
         # If no scratch folder is specified, we use the output folder
         # else we create a temporary folder in the scratch partition
@@ -88,6 +97,7 @@ class GNEB_Node(NodeMixin):
             self.scratch_folder = os.path.join(
                 scratch_folder, self.name + "#" + str(self.uuid)
             )
+            self.log(f"Creating scratch folder `{self.scratch_folder}`")
             os.makedirs(self.scratch_folder)
 
         # The current chain is always saved here
@@ -97,19 +107,18 @@ class GNEB_Node(NodeMixin):
         self.chain_file_post_run = self.output_folder + "/chain.ovf"
 
         # If an initial chain is specified we copy it to the output folder
-        if initial_chain_file:
+        if not initial_chain_file is None:
+            self.log(
+                f"Copying initial chain file `{initial_chain_file}` to `{self.chain_file}`"
+            )
             if not os.path.exists(initial_chain_file):
                 raise Exception(
                     "Initial chain file ({}) does not exist!".format(initial_chain_file)
                 )
             self.initial_chain_file = initial_chain_file
             shutil.copyfile(initial_chain_file, self.chain_file)
-
-        # If no log file has been specified we put one in the output folder
-        if not gneb_workflow_log_file:
-            self.gneb_workflow_log_file = self.output_folder + "/workflow_log.txt"
         else:
-            self.gneb_workflow_log_file = gneb_workflow_log_file
+            self.log("No initial chain file specified in constructor")
 
         if children:
             self.children = children
@@ -696,7 +705,7 @@ class GNEB_Node(NodeMixin):
 
         # Before we run we must make sure that the chain.ovf file exists now
         if not os.path.exists(self.chain_file):
-            raise Exception("Chain file does not exist!")
+            raise Exception("Chain file {} does not exist!".format(self.chain_file))
 
         if self.path_shortening_constant > 0:
             parameters.gneb.set_path_shortening_constant(
