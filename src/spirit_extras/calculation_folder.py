@@ -1,32 +1,69 @@
-import json, os, pprint, shutil, yaml
+import json, os, pprint, shutil, yaml, glob
 
 
 class Calculation_Folder(os.PathLike, dict):
     """Represents one folder of a calculation."""
 
-    def __init__(self, output_folder, create=False, descriptor_file="descriptor.json"):
+    DEFAULT_DESC_FILE = "descriptor.json"
+
+    def __init__(self, output_folder, create=False, descriptor_file=None):
         self.output_folder = os.path.normpath(os.path.abspath(output_folder))
+        self._created = False
         if not os.path.isdir(self.output_folder):
             if not create:
                 raise Exception(
                     f"Directory {self.output_folder} either does not exist or is a file that is not a directory. Call constructor with 'create=True' to create it."
                 )
             else:
+                self._created = True
                 os.makedirs(self.output_folder)
 
         self._lock_file = "~lock"
 
-        # We enforce that the descriptor file is at the root of the output folder
-        if (
-            not os.path.normpath(os.path.dirname(self.to_abspath(descriptor_file)))
-            == self.output_folder
-        ):
-            raise Exception(
-                "The descriptor file has to be at the root of the calculation folder!"
-            )
+        self.infer_descriptor_file(descriptor_file)
 
-        # Deal with the type of the descriptor file
-        self._descriptor_file_name = os.path.normpath(descriptor_file)
+        self.from_desc()
+
+    def infer_descriptor_file(self, descriptor_file_constructor_argument):
+        # We enforce that the descriptor file is at the root of the output folder
+        if not descriptor_file_constructor_argument is None:
+            descriptor_file_path = os.path.normpath(
+                os.path.dirname(self.to_abspath(descriptor_file_constructor_argument))
+            )
+            if not descriptor_file_path == self.output_folder:
+                raise Exception(
+                    "The descriptor file has to be at the root of the calculation folder!"
+                )
+
+        # Deal with unspecified descriptor file
+        if descriptor_file_constructor_argument is None:
+            if self._created:  # Use default value when creating
+                descriptor_file_constructor_argument = self.DEFAULT_DESC_FILE
+            else:  # Try to infer descriptor file
+                paths_json = glob.glob(os.path.join(self, "*.json"))
+                paths_yaml = glob.glob(os.path.join(self, "*.yaml"))
+                paths_yml = glob.glob(os.path.join(self, "*.yml"))
+
+                n_files_found = len(paths_json) + len(paths_yaml) + len(paths_yml)
+                if n_files_found == 0:
+                    descriptor_file_constructor_argument = self.DEFAULT_DESC_FILE
+                elif n_files_found >= 2:
+                    raise Exception(
+                        f"Error when trying to infer descriptor files. Multiple *.json, *.yaml or *.yml files found in {self}:\n"
+                        f".json: {paths_json}\n"
+                        f".yaml: {paths_yaml}\n"
+                        f".yml: {paths_yml}\n"
+                        "Specify `descriptor_file_name` in constructor"
+                    )
+
+                for p in [paths_json, paths_yaml, paths_yml]:
+                    if len(p) == 1:
+                        descriptor_file_constructor_argument = p[0]
+
+        # Split the constructor argument into name and extension
+        self._descriptor_file_name = os.path.normpath(
+            descriptor_file_constructor_argument
+        )
         self._descriptor_file_name_base, self._descriptor_file_ext = os.path.splitext(
             self._descriptor_file_name
         )
@@ -37,12 +74,11 @@ class Calculation_Folder(os.PathLike, dict):
             self._descriptor_file_ext == ".yml" or self._descriptor_file_ext == ".yaml"
         ):
             self.use_json = False
-        else:
+
+        if self._created and self._descriptor_file_ext == "":
             raise Exception(
                 "Only `.yaml`, `.yml` and `.json` are supported as descriptor file endings"
             )
-
-        self.from_desc()
 
     def __str__(self):
         return str(self.output_folder)
