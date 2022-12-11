@@ -4,11 +4,10 @@ from matplotlib.collections import PatchCollection
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib as mpl
 import numpy as np
-import os
 
 
 class Paper_Plot:
-    # Settings
+    # one cm in inches
     cm = 1 / 2.54
 
     # Annotations
@@ -32,53 +31,231 @@ class Paper_Plot:
         "dl": offset_dl,
     }
 
-    def __init__(self, width) -> None:
-        mpl.rcParams["font.size"] = 8  #'dejavusans' (default),
-        mpl.rcParams["font.family"] = "serif"  #'dejavusans' (default),
-        mpl.rcParams["mathtext.fontset"] = "dejavuserif"  #'dejavusans' (default),
-        plt.rc("xtick", labelsize=8)
-        plt.rc("ytick", labelsize=8)
-        plt.rc("axes", labelsize=8)
+    default_rcParams = {
+        "font.size": 8,
+        "font.family": "serif",
+        "mathtext.fontset": "dejavuserif",
+        "xtick.labelsize": 7,
+        "ytick.labelsize": 7,
+        "axes.labelsize": 8,
+    }
 
-        self.annotate_offset_scale = 1
+    # __slots__ = ["annotate_letter", "width", "height", "ncols", "nrows"]
+
+    def __init__(self, width, height=None, nrows=1, ncols=1, rcParams=None) -> None:
+
+        self._ncols = ncols
+        self._nrows = nrows
+        self.width = width
+
+        if height is None:
+            height = width
+
+        self.height = height
+
+        if rcParams is None:
+            rcParams = self.default_rcParams
+
+        mpl.rcParams.update(rcParams)
 
         self.annotate_letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         # self.annotate_letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".lower()
         # self.annotate_letter = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
         # self.annotate_letter = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
-        self.width = width
-        self.height = width
+        self._horizontal_margins = [0.1, 0.1]
+        self._vertical_margins = [0.1, 0.1]
+        self._wspace = 0.1
+        self._hspace = 0.1
 
-        self.ncols = 1
-        self.nrows = 1
-        self.horizontal_margins = [0.1, 0.1]
-        self.vertical_margins = [0.1, 0.1]
-        self.wspace = 0
-        self.hspace = 0
-
-        self.width_ratios = None
-        self.height_ratios = None
+        self._width_ratios = None
+        self._height_ratios = None
 
         self._fig = None
         self._gs = None
 
-        # self.annotate_increment = 0
         self.annotation_dict = {}
 
+    def info_string(self):
+        res = "Paper_Plot\n"
+        res += f"\t width  = {self.width:.3f} inch ({self.width / self.cm:.3f} cm)\n"
+        res += f"\t height = {self.height:.3f} inch ({self.height / self.cm:.3f} cm)\n"
+        res += f"\t ncols  = {self.ncols}\n"
+        res += f"\t nrows  = {self.nrows}\n"
+        res += f"\t wspace = {self.wspace}\n"
+        res += f"\t hspace = {self.hspace}\n"
+        res += f"\t horizontal_margins = {self.horizontal_margins}\n"
+        res += f"\t vertical_margins = {self.vertical_margins}\n"
+        res += f"\t width_ratios = {self.width_ratios}\n"
+        res += f"\t height_ratios = {self.height_ratios}\n"
+        return res
+
+    @property
+    def ncols(self):
+        return self._ncols
+
+    @ncols.setter
+    def ncols(self, value):
+        if value != self._ncols and self._width_ratios:
+            print("WARNING: changing ncols resets width_ratios")
+            self._width_ratios = None
+        self._ncols = value
+
+    @property
+    def nrows(self):
+        return self._nrows
+
+    @nrows.setter
+    def nrows(self, value):
+        if value != self._nrows and self._height_ratios:
+            print("WARNING: changing ncols resets height_ratios")
+            self._height_ratios = None
+        self._nrows = value
+
+    @property
+    def font_size(self):
+        return mpl.rcParams["font.size"]
+
+    @font_size.setter
+    def font_size(self, value):
+        mpl.rcParams["font.size"] = value
+
+    @property
+    def axes_labelsize(self):
+        return mpl.rcParams["axes.labelsize"]
+
+    @axes_labelsize.setter
+    def axes_labelsize(self, value):
+        mpl.rcParams["axes.labelsize"] = value
+
+    @property
+    def xtick_labelsize(self):
+        return mpl.rcParams["xtick.labelsize"]
+
+    @xtick_labelsize.setter
+    def axes_labelsize(self, value):
+        mpl.rcParams["xtick.labelsize"] = value
+
+    @property
+    def ytick_labelsize(self):
+        return mpl.rcParams["ytick.labelsize"]
+
+    @ytick_labelsize.setter
+    def axes_labelsize(self, value):
+        mpl.rcParams["ytick.labelsize"] = value
+
+    @property
+    def width_ratios(self):
+        return self._width_ratios
+
+    @width_ratios.setter
+    def width_ratios(self, value):
+        if value is None:
+            self._width_ratios = None
+            return
+
+        if len(value) == self.ncols:
+            self._width_ratios = value
+        else:
+            raise Exception(f"Length of width_ratios has to match ncols {self.ncols}")
+
+    @property
+    def height_ratios(self):
+        return self._height_ratios
+
+    @height_ratios.setter
+    def height_ratios(self, value):
+        if value is None:
+            self._height_ratios = None
+            return
+
+        if len(value) == self.nrows:
+            self._height_ratios = value
+        else:
+            raise Exception(f"Length of height_ratios has to match nrows {self.nrows}")
+
+    @property
+    def wspace(self):
+        return self._wspace
+
+    @wspace.setter
+    def wspace(self, value):
+        self._wspace = value
+
+    @property
+    def hspace(self):
+        return self._hspace
+
+    @hspace.setter
+    def hspace(self, value):
+        self._hspace = value
+
+    @property
+    def horizontal_margins(self):
+        return self._horizontal_margins.copy()
+
+    @horizontal_margins.setter
+    def horizontal_margins(self, value):
+        if np.asarray(value).shape == (2,):
+            self._horizontal_margins = value
+        else:
+            raise Exception(
+                "horizontal_margins has to have shape (2,) but you specified {}".format(
+                    value
+                )
+            )
+
+    @property
+    def vertical_margins(self):
+        return self._vertical_margins.copy()
+
+    @vertical_margins.setter
+    def vertical_margins(self, value):
+        if np.asarray(value).shape == (2,):
+            self._vertical_margins = value
+        else:
+            raise Exception(
+                "vertical_margins has to have shape (2,) but you specified {}".format(
+                    value
+                )
+            )
+
     def height_from_aspect_ratio(self, aspect_ratio):
+        """The width of the figure (including all margins) is fixed. The aspect ratio is the aspect ratio of all content, excluding hspace and wspace"""
+
+        # Deal with width
         rel_margin_w = sum(self.horizontal_margins)
-        rel_space_w = self.wspace * (1 - rel_margin_w) / self.ncols
+        rel_width_minus_margins = 1 - rel_margin_w
+
+        rel_average_subplot_width = rel_width_minus_margins / (
+            self.ncols + self.wspace * (self.ncols - 1)
+        )
+        if self.ncols > 1:
+            rel_total_wspace_between_subplots = (
+                rel_average_subplot_width * self.wspace * (self.ncols - 1)
+            )
+        else:
+            rel_total_wspace_between_subplots = 0
+
+        width_prefactor = rel_width_minus_margins - rel_total_wspace_between_subplots
 
         rel_margin_h = sum(self.vertical_margins)
-        rel_space_h = self.hspace * (1 - rel_margin_h) / self.nrows
-
-        self.height = (
-            self.width
-            / aspect_ratio
-            * (1 - rel_margin_w - rel_space_w)
-            / (1 - rel_margin_h - rel_space_h)
+        rel_height_minus_margins = 1 - rel_margin_h
+        rel_average_subplot_height = rel_height_minus_margins / (
+            self.nrows + self.hspace * (self.nrows - 1)
         )
+
+        if self.nrows > 1:
+            rel_total_hspace_between_subplots = (
+                rel_average_subplot_height * self.hspace * (self.nrows - 1)
+            )
+        else:
+            rel_total_hspace_between_subplots = 0
+
+        height_prefactor = rel_height_minus_margins - rel_total_hspace_between_subplots
+
+        # aspect_ratio = self.width/self.height * width_prefactor / height_prefactor
+        self.height = self.width / aspect_ratio * width_prefactor / height_prefactor
 
     def fig(self):
         self._fig = plt.figure(figsize=(self.width, self.height))
@@ -107,7 +284,7 @@ class Paper_Plot:
             fontsize=fontsize,
             horizontalalignment="left",
             verticalalignment="top",
-            transform=ax.transAxes
+            transform=ax.transAxes,
         )
 
     def crop_to_content(
@@ -115,16 +292,22 @@ class Paper_Plot:
     ):
         N_CHANNELS = image.shape[-1]  # Number of channels in the picture
         image_shape = image.shape
-        n_pixels = image.shape[0] * image.shape[1]
 
-        img_flatten = image.reshape((n_pixels, N_CHANNELS))
-
-        # If no background color is specified, we take the most frequent color
+        # If no background color is specified, we take the most frequent color among the corners
         if background_color is None:
-            unique, counts = np.unique(img_flatten, return_counts=True, axis=0)
-            idx_max_count = np.argmax(counts)
-            most_frequent_color = unique[idx_max_count]
-            background_color = most_frequent_color
+            corner_colors = [image[0, 0], image[0, -1], image[-1, 0], image[-1, -1]]
+
+            # As soon as we find the first repeated color we can stop, since a count of two will always be at least 50%
+            # TODO: these loops look stupid but they work
+            for cc in corner_colors:
+                for cc2 in corner_colors:
+                    if np.all(cc == cc2):
+                        background_color = cc
+                        break
+                if np.all(cc == cc2):
+                    break
+
+            background_color = corner_colors[0]
 
         # I think I know why this works
         indices = np.argwhere(np.any(image[:, :] != background_color, axis=2))
@@ -396,7 +579,7 @@ def plot_energy_path(
         ax.plot(
             Rx_int,
             np.asarray(energy_path.interpolated_total_energy) - E0,
-            **kwargs_interpolated
+            **kwargs_interpolated,
         )
 
     Rx = np.array(energy_path.reaction_coordinate)
