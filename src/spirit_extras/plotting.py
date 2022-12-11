@@ -225,37 +225,62 @@ class Paper_Plot:
 
         # Deal with width
         rel_margin_w = sum(self.horizontal_margins)
-        rel_width_minus_margins = 1 - rel_margin_w
+        rel_width_minus_margins = 1.0 - rel_margin_w
 
         rel_average_subplot_width = rel_width_minus_margins / (
             self.ncols + self.wspace * (self.ncols - 1)
         )
-        if self.ncols > 1:
-            rel_total_wspace_between_subplots = (
-                rel_average_subplot_width * self.wspace * (self.ncols - 1)
-            )
-        else:
-            rel_total_wspace_between_subplots = 0
+
+        rel_total_wspace_between_subplots = (
+            rel_average_subplot_width * self.wspace * (self.ncols - 1)
+        )
 
         width_prefactor = rel_width_minus_margins - rel_total_wspace_between_subplots
 
         rel_margin_h = sum(self.vertical_margins)
         rel_height_minus_margins = 1 - rel_margin_h
+
         rel_average_subplot_height = rel_height_minus_margins / (
             self.nrows + self.hspace * (self.nrows - 1)
         )
 
-        if self.nrows > 1:
-            rel_total_hspace_between_subplots = (
-                rel_average_subplot_height * self.hspace * (self.nrows - 1)
-            )
-        else:
-            rel_total_hspace_between_subplots = 0
-
+        rel_total_hspace_between_subplots = (
+            rel_average_subplot_height * self.hspace * (self.nrows - 1)
+        )
         height_prefactor = rel_height_minus_margins - rel_total_hspace_between_subplots
 
         # aspect_ratio = self.width/self.height * width_prefactor / height_prefactor
         self.height = self.width / aspect_ratio * width_prefactor / height_prefactor
+
+    def apply_absolute_margins(
+        self,
+        aspect_ratio,
+        abs_hspace,
+        abs_wspace,
+        abs_vertical_margins,
+        abs_horizontal_margins,
+    ):
+        abs_horizontal_margins = np.array(abs_horizontal_margins, dtype=float)
+        abs_vertical_margins = np.array(abs_vertical_margins, dtype=float)
+
+        abs_margin_w = np.sum(abs_horizontal_margins)
+        abs_margin_h = np.sum(abs_vertical_margins)
+
+        abs_content_width = self.width - abs_wspace * (self.ncols - 1) - abs_margin_w
+        if abs_content_width <= 0:
+            raise Exception(
+                "horizontal margins and wspace are too big. There is no space left for the content."
+            )
+
+        abs_content_height = abs_content_width / aspect_ratio
+
+        self.hspace = abs_hspace / abs_content_height * self.nrows
+
+        self.wspace = abs_wspace / abs_content_width * self.ncols
+        self.height = abs_content_height + abs_margin_h + abs_hspace * (self.nrows - 1)
+
+        self.horizontal_margins = abs_horizontal_margins / self.width
+        self.vertical_margins = abs_vertical_margins / self.height
 
     def fig(self):
         self._fig = plt.figure(figsize=(self.width, self.height))

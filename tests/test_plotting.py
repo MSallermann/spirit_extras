@@ -107,3 +107,32 @@ class Paper_Plot_Test(unittest.TestCase):
 
         fig.suptitle("All diamonds should be perfectly inscribed in the squares!")
         fig.savefig(os.path.join(self.OUTPUT_FOLDER, "test_fig_aspect.png"), dpi=300)
+
+    def test_abs_margins(self):
+        pplot = Paper_Plot(30 * Paper_Plot.cm)
+
+        pplot.ncols = 2
+        pplot.nrows = 2
+
+        print(pplot.info_string())
+        pplot.apply_absolute_margins(
+            pplot.ncols / pplot.nrows,
+            abs_hspace=2.5 * Paper_Plot.cm,
+            abs_wspace=2.5 * Paper_Plot.cm,
+            abs_horizontal_margins=np.ones(2) * Paper_Plot.cm,
+            abs_vertical_margins=np.ones(2) * Paper_Plot.cm,
+        )
+        print(pplot.info_string())
+
+        fig = pplot.fig()
+        gs = pplot.gs()
+
+        for irow in range(pplot.nrows):
+            for ax in pplot.row(irow):
+                pplot.image_to_ax(ax, os.path.join(self.IMAGE_FOLDER, "square.png"))
+                pplot.spine_axis(ax)
+
+        # fig.suptitle("All diamonds should be perfectly inscribed in the squares!")
+        fig.savefig(
+            os.path.join(self.OUTPUT_FOLDER, "test_fig_abs_margins.png"), dpi=300
+        )
