@@ -47,7 +47,11 @@ class Calculation_Folder(os.PathLike, dict):
                 n_files_found = len(paths_json) + len(paths_yaml) + len(paths_yml)
                 if n_files_found == 0:
                     descriptor_file_constructor_argument = self.DEFAULT_DESC_FILE
-                elif n_files_found >= 2:
+                elif n_files_found == 1:
+                    for p in [paths_json, paths_yaml, paths_yml]:
+                        if len(p) == 1:
+                            descriptor_file_constructor_argument = p[0]
+                else:
                     raise Exception(
                         f"Error when trying to infer descriptor files. Multiple *.json, *.yaml or *.yml files found in {self}:\n"
                         f".json: {paths_json}\n"
@@ -55,10 +59,6 @@ class Calculation_Folder(os.PathLike, dict):
                         f".yml: {paths_yml}\n"
                         "Specify `descriptor_file_name` in constructor"
                     )
-
-                for p in [paths_json, paths_yaml, paths_yml]:
-                    if len(p) == 1:
-                        descriptor_file_constructor_argument = p[0]
 
         # Split the constructor argument into name and extension
         self._descriptor_file_name = os.path.normpath(
