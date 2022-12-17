@@ -254,11 +254,15 @@ class Paper_Plot:
 
     def apply_absolute_margins(
         self,
-        aspect_ratio,
-        abs_hspace,
-        abs_wspace,
-        abs_vertical_margins,
-        abs_horizontal_margins,
+        aspect_ratio=1.62,
+        abs_hspace=0.5 * cm,
+        abs_wspace=0.5 * cm,
+        abs_vertical_margins=[0.15 * cm, 0.15 * cm],
+        abs_horizontal_margins=[0.15 * cm, 0.15 * cm],
+        abs_heights=None,
+        abs_widths=None,
+        abs_content_width=None,
+        abs_content_height=None,
     ):
         abs_horizontal_margins = np.array(abs_horizontal_margins, dtype=float)
         abs_vertical_margins = np.array(abs_vertical_margins, dtype=float)
@@ -266,19 +270,78 @@ class Paper_Plot:
         abs_margin_w = np.sum(abs_horizontal_margins)
         abs_margin_h = np.sum(abs_vertical_margins)
 
-        abs_content_width = self.width - abs_wspace * (self.ncols - 1) - abs_margin_w
+        if abs_content_width is None:
+            abs_content_width = (
+                self.width - abs_wspace * (self.ncols - 1) - abs_margin_w
+            )
+        else:
+            self.width = (
+                abs_content_width + abs_wspace * (self.ncols - 1) + abs_margin_w
+            )
+
         if abs_content_width <= 0:
             raise Exception(
                 "horizontal margins and wspace are too big. There is no space left for the content."
             )
 
-        abs_content_height = abs_content_width / aspect_ratio
+        if not abs_widths is None:
+            abs_widths = np.array(abs_widths)
+
+            self.width_ratios = abs_widths / abs_content_width
+
+            remaining_width = abs_content_width - np.sum(abs_widths[abs_widths >= 0])
+
+            if remaining_width < 0:
+                raise Exception("Absolute widths are larger than total width")
+
+            total_weight_of_relative_widths = np.sum(abs_widths[abs_widths < 0])
+
+            # divide the remaining width according to the relative width ratios
+            for idx_w, w in enumerate(abs_widths):
+                if w < 0:
+                    self.width_ratios[idx_w] = (
+                        w
+                        / total_weight_of_relative_widths
+                        * remaining_width
+                        / abs_content_width
+                    )
+
+        if not aspect_ratio is None:
+            abs_content_height = abs_content_width / aspect_ratio
+        elif not abs_content_height is None:
+            abs_content_height = abs_content_height
+        else:
+            abs_content_height = (
+                self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
+            )
+
+        if not abs_heights is None:
+            abs_heights = np.array(abs_heights)
+
+            self.height_ratios = abs_heights / abs_content_height
+
+            remaining_height = abs_content_height - np.sum(
+                abs_heights[abs_heights >= 0]
+            )
+
+            if remaining_height < 0:
+                raise Exception("Absolute heights are larger than total height")
+
+            total_weight_of_relative_heights = np.sum(abs_heights[abs_heights < 0])
+
+            # divide the remaining width according to the relative width ratios
+            for idx_h, h in enumerate(abs_heights):
+                if h < 0:
+                    self.height_ratios[idx_h] = (
+                        h
+                        / total_weight_of_relative_heights
+                        * remaining_height
+                        / abs_content_height
+                    )
 
         self.hspace = abs_hspace / abs_content_height * self.nrows
-
         self.wspace = abs_wspace / abs_content_width * self.ncols
         self.height = abs_content_height + abs_margin_h + abs_hspace * (self.nrows - 1)
-
         self.horizontal_margins = abs_horizontal_margins / self.width
         self.vertical_margins = abs_vertical_margins / self.height
 
@@ -302,7 +365,7 @@ class Paper_Plot:
         )
         return self._gs
 
-    def annotate(self, ax, text, pos=[0, 0.98], fontsize=8):
+    def annotate(self, ax, text, pos=[0, 0.98], fontsize=8, **kwargs):
         ax.text(
             *pos,
             text,
@@ -310,6 +373,7 @@ class Paper_Plot:
             horizontalalignment="left",
             verticalalignment="top",
             transform=ax.transAxes,
+            **kwargs,
         )
 
     def crop_to_content(
@@ -377,6 +441,7 @@ class Paper_Plot:
 
         if os.path.exists(image):
             image = plt.imread(image)
+
         ax.imshow(image)
         ax.tick_params(
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
