@@ -311,9 +311,14 @@ class Paper_Plot:
         elif not abs_content_height is None:
             abs_content_height = abs_content_height
         else:
-            abs_content_height = (
-                self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
-            )
+            if np.all(
+                np.array(abs_heights) >= 0
+            ):  # In some cases the abs content height can be computed from the given heights
+                abs_content_height = np.sum(abs_heights)
+            else:
+                abs_content_height = (
+                    self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
+                )
 
         if not abs_heights is None:
             abs_heights = np.array(abs_heights)
@@ -441,6 +446,8 @@ class Paper_Plot:
 
         if os.path.exists(image):
             image = plt.imread(image)
+        elif isinstance(image, str):
+            raise Exception(f"`{image}` does not exist")
 
         ax.imshow(image)
         ax.tick_params(
