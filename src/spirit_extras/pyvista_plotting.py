@@ -70,7 +70,8 @@ def arrows_from_point_cloud(
     import pyvista as pv
 
     if geom is None:
-        geom = pv.Cone(radius=0.25, resolution=18)
+        geom = pv.Cone(radius=0.25, resolution=9)
+
     arrows = point_cloud.glyph(orient=orient, scale=scale, factor=factor, geom=geom)
     return arrows
 
@@ -212,6 +213,7 @@ class Spin_Plotter:
         "camera_distance",
         "camera_view_angle",
         "_preimages",
+        "_plotter",
         "default_render_args",
     ]
 
@@ -237,6 +239,8 @@ class Spin_Plotter:
         self.camera_view_angle = None
 
         self._preimages = []
+
+        self._plotter = None
 
         self.default_render_args = dict(
             scalars="spins_rgba",
@@ -282,15 +286,21 @@ class Spin_Plotter:
         res = res / np.linalg.norm(res)
         return res
 
-    def set_camera_focus(self, distance=80, direction="X", view_angle=None):
+    def set_camera_focus(
+        self, distance=80, direction="X", view_angle=None, look_at=None
+    ):
+        if look_at is None:
+            look_at = self.spin_system.center()
+        look_at = np.array(look_at, dtype=float)
+
         if type(direction) is str:
             direction = self._string_to_direction(direction)
 
         direction /= np.linalg.norm(direction)
 
         self.camera_view_angle = view_angle
-        self.camera_position = self.spin_system.center() + distance * direction
-        self.camera_focal_point = self.spin_system.center() - 2 * distance * direction
+        self.camera_position = look_at + distance * direction
+        self.camera_focal_point = look_at - 2 * distance * direction
 
         # self.camera_focal_point = self.spin_system.center()
 
@@ -392,6 +402,8 @@ class Spin_Plotter:
 
     def clear_meshes(self):
         self.meshlist = []
+        if not self._plotter is None:
+            self._plotter.clear()
 
     def isosurface(self, isovalue, scalars_key, render_args=None):
         if not self._delaunay:
@@ -452,9 +464,18 @@ class Spin_Plotter:
             z_color=colors[2],
         )
 
+    def plotter(self, render_to_png=True, xvfb_wait=0):
+        if self._plotter is None:
+            if render_to_png:
+                pv.start_xvfb(wait=xvfb_wait)
+            self._plotter = pv.Plotter(
+                off_screen=render_to_png, shape=(1, 1), multi_samples=8
+            )
+            self._plotter.window_size = self.resolution
+        return self._plotter
+
     def show(self, save_camera_file=None):
-        plotter = pv.Plotter(shape=(1, 1))
-        plotter.window_size = self.resolution
+        plotter = self.plotter(render_to_png=False)
 
         self._set_camera(plotter)
 
@@ -487,16 +508,14 @@ class Spin_Plotter:
             )
             with open(save_camera_file, "w") as f:
                 f.write(json.dumps(camera_dict, indent=4))
-        plotter.close()
 
     def render_to_png(self, png_path):
         file_name, ext = os.path.splitext(png_path)
         if not (len(ext) == 0 or ext.lower() == ".png"):
             raise Exception("File extension must be either '.png' or not specified")
 
-        pv.start_xvfb()
-        plotter = pv.Plotter(off_screen=True, shape=(1, 1), multi_samples=8)
-        plotter.window_size = self.resolution
+        plotter = self.plotter()
+
         self._set_camera(plotter)
 
         for m, args in self.meshlist:
@@ -519,4 +538,7 @@ class Spin_Plotter:
         plotter.screenshot(
             file_name + ".png", transparent_background=transparent_background
         )
-        plotter.close()
+
+    def __del__(self):
+        if not self._plotter is None:
+            self._plotter.close()

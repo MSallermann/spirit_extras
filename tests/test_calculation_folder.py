@@ -8,13 +8,15 @@ class Calculation_Folder_Test(unittest.TestCase):
     FOLDER2 = os.path.abspath(os.path.join(os.path.dirname(__file__), "test_folder2"))
 
     def setUp(self) -> None:
-        if os.path.exists(self.FOLDER):
-            shutil.rmtree(self.FOLDER)
+        for f in [self.FOLDER, self.FOLDER2]:
+            if os.path.exists(f):
+                shutil.rmtree(f)
         return super().setUp()
 
     def tearDown(self) -> None:
-        if os.path.exists(self.FOLDER):
-            shutil.rmtree(self.FOLDER)
+        for f in [self.FOLDER, self.FOLDER2]:
+            if os.path.exists(f):
+                shutil.rmtree(f)
         return super().tearDown()
 
     @unittest.expectedFailure
@@ -157,3 +159,50 @@ class Calculation_Folder_Test(unittest.TestCase):
 
         self.assertEqual(dict(folder), dict(folder2))
         self.assertEqual(dict(folder), dict(folder3))
+
+    def test_infer_descriptor(self):
+        folder = calculation_folder.Calculation_Folder(
+            self.FOLDER, create=True, descriptor_file="some_desc.yml"
+        )
+        folder["key1"] = 100112.123234
+        folder["key2"] = "string"
+        folder["key3"] = [1, 2, 3]
+        folder["key4"] = dict(key1="a", key2=2)
+        folder["weird_key#1"] = "val"
+        folder.to_desc()
+
+        # descriptor_file `some_desc.yml` should be inferred
+        folder2 = calculation_folder.Calculation_Folder(self.FOLDER)
+        self.assertEqual(dict(folder), dict(folder2))
+
+        # Should raise an exception since now we have 'some_desc.yml', 'other_desc.yaml' and 'other_desc.json'
+        folder2.to_yaml("other_desc.yaml")
+        folder2.to_json("other_desc.json")
+        with self.assertRaises(Exception):
+            calculation_folder.Calculation_Folder(self.FOLDER)
+
+        # Should work since we are specifying the descriptor file
+        folder3 = calculation_folder.Calculation_Folder(
+            self.FOLDER, descriptor_file="other_desc.json"
+        )
+        self.assertEqual(dict(folder), dict(folder3))
+
+        # Now some tests with self.FOLDER2
+        second_folder = calculation_folder.Calculation_Folder(self.FOLDER2, True)
+        second_folder["key"] = "value"
+        second_folder.to_desc()
+        self.assertTrue(second_folder.use_json)
+        self.assertTrue(
+            os.path.exists(os.path.join(second_folder, second_folder.DEFAULT_DESC_FILE))
+        )
+
+        second_folder2 = calculation_folder.Calculation_Folder(
+            self.FOLDER2, descriptor_file="desc.yml"
+        )
+        second_folder2["key"] = "other_value"
+        second_folder2.to_desc()
+
+        self.assertTrue(os.path.exists(os.path.join(second_folder, "desc.yml")))
+        self.assertTrue(not second_folder2.use_json)
+
+        print(len(second_folder2.keys()))

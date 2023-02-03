@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from spirit_extras.pyvista_plotting import Spin_Plotter
 from spirit_extras import data
-from spirit import state, configuration
+from spirit import state, configuration, geometry
 import os
 
 
@@ -20,7 +20,7 @@ class Pyvista_Plotting_Test(unittest.TestCase):
     def tearDown(self) -> None:
         pass
 
-    def test(self):
+    def test_random(self):
         with state.State(self.INPUT_FILE, quiet=True) as p_state:
             configuration.plus_z(p_state)
             configuration.hopfion(p_state, radius=5)
@@ -68,4 +68,38 @@ class Pyvista_Plotting_Test(unittest.TestCase):
         plotter.arrows()
         plotter.render_to_png(
             os.path.join(os.path.join(self.PLOT_OUTPUTS, "cones_colormap_rb_x.png"))
+        )
+
+    def test_some_skyrmion_plot(self):
+        import pyvista as pv
+
+        with state.State(self.INPUT_FILE, quiet=True) as p_state:
+            geometry.set_n_cells(p_state, [64, 64, 1])
+            configuration.plus_z(p_state)
+            configuration.skyrmion(p_state, radius=10)
+            spin_system = data.spin_system_from_p_state(p_state).deepcopy()
+
+        plotter = Spin_Plotter(spin_system)
+        plotter.axes = True
+        plotter.resolution = (1600, 1600)
+        plotter.background_color = "lightgrey"
+        plotter.colormap("hsv")
+        plotter.arrows()
+        plotter.set_camera_focus(50, "XZ")
+
+        plotter.render_to_png(
+            os.path.join(os.path.join(self.PLOT_OUTPUTS, "skyrmion.png"))
+        )
+
+        with state.State(self.INPUT_FILE, quiet=True) as p_state:
+            geometry.set_n_cells(p_state, [64, 64, 1])
+            configuration.plus_z(p_state)
+            configuration.skyrmion(p_state, radius=5)
+            spin_system2 = data.spin_system_from_p_state(p_state).deepcopy()
+
+        plotter.update_spins(spin_system2)
+        plotter.clear_meshes()
+        plotter.arrows()
+        plotter.render_to_png(
+            os.path.join(os.path.join(self.PLOT_OUTPUTS, "skyrmion2.png"))
         )
