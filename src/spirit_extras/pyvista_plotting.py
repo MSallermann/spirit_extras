@@ -7,7 +7,6 @@ import numpy as np
 import os
 import json
 
-
 def create_point_cloud(spin_system):
     import pyvista as pv
 
@@ -217,6 +216,7 @@ class Spin_Plotter:
         "_render_to_png",
         "default_render_args",
         "_colormap",
+        "shape"
     ]
 
     def __init__(self, system):
@@ -240,6 +240,7 @@ class Spin_Plotter:
         self.camera_distance = None
         self.camera_view_angle = None
         self._render_to_png = True
+        self.shape = (1,1)
 
         self._preimages = []
 
@@ -469,15 +470,23 @@ class Spin_Plotter:
             z_color=colors[2],
         )
 
-    def plotter(self, render_to_png=True, xvfb_wait=0) -> pv.Plotter:
-        if self._plotter is None or render_to_png != self._render_to_png:
+    def plotter(self, render_to_png=True, shape=None, xvfb_wait=0) -> pv.Plotter:
+        if shape is None:
+            shape = self.shape
+
+        new_plotter = False
+        if render_to_png != self._render_to_png or shape != self.shape:
+            new_plotter = True
+
+        if self._plotter is None or new_plotter:
             self._render_to_png = render_to_png
+            self.shape = shape
             if not self._plotter is None:
                 self._plotter.close()
             if render_to_png:
                 pv.start_xvfb(wait=xvfb_wait)
             self._plotter = pv.Plotter(
-                off_screen=render_to_png, shape=(1, 1), multi_samples=8
+                off_screen=render_to_png, shape=self.shape, multi_samples=8
             )
             self._plotter.window_size = self.resolution
         return self._plotter
