@@ -7,6 +7,7 @@ import numpy as np
 import os
 import json
 
+
 def create_point_cloud(spin_system):
     import pyvista as pv
 
@@ -216,7 +217,7 @@ class Spin_Plotter:
         "_render_to_png",
         "default_render_args",
         "_colormap",
-        "shape"
+        "shape",
     ]
 
     def __init__(self, system):
@@ -240,7 +241,7 @@ class Spin_Plotter:
         self.camera_distance = None
         self.camera_view_angle = None
         self._render_to_png = True
-        self.shape = (1,1)
+        self.shape = (1, 1)
 
         self._preimages = []
 
