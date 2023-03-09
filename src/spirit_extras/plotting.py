@@ -311,9 +311,22 @@ class Paper_Plot:
         elif not abs_content_height is None:
             abs_content_height = abs_content_height
         else:
-            abs_content_height = (
-                self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
-            )
+            if np.all(
+                np.array(abs_heights) >= 0
+            ):  # In some cases the abs content height can be computed from the given heights
+                abs_content_height = np.sum(abs_heights)
+            else:
+                abs_content_height = (
+                    self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
+                )
+
+                if abs_content_height < 0:
+                    raise Exception(
+                        "Absolute height for content of figure is smaller than zero.\n"
+                    )
+                print(
+                    "WARNING: Using the currently set height to compute the absolute content height."
+                )
 
         if not abs_heights is None:
             abs_heights = np.array(abs_heights)
@@ -329,7 +342,7 @@ class Paper_Plot:
 
             total_weight_of_relative_heights = np.sum(abs_heights[abs_heights < 0])
 
-            # divide the remaining width according to the relative width ratios
+            # divide the remaining height according to the relative height ratios
             for idx_h, h in enumerate(abs_heights):
                 if h < 0:
                     self.height_ratios[idx_h] = (
@@ -375,6 +388,43 @@ class Paper_Plot:
             transform=ax.transAxes,
             **kwargs,
         )
+
+    def replace_background_color(self, image, replacement_color, background_color=None):
+
+        N_CHANNELS = image.shape[-1]  # Number of channels in the picture
+        image_shape = image.shape
+
+        # If no background color is specified, we take the most frequent color among the corners
+        if background_color is None:
+            corner_colors = [image[0, 0], image[0, -1], image[-1, 0], image[-1, -1]]
+            # As soon as we find the first repeated color we can stop, since a count of two will always be at least 50%
+            # TODO: these loops look stupid but they work
+            for cc in corner_colors:
+                for cc2 in corner_colors:
+                    if np.all(cc == cc2):
+                        background_color = cc
+                        break
+                if np.all(cc == cc2):
+                    break
+            background_color = corner_colors[0]
+
+        N_CHANNELS_BG = len(replacement_color)
+
+        # If the background color has more channels than the picture, we need to introduce the alpha channel
+        if N_CHANNELS_BG > N_CHANNELS and replacement_color[-1] != 1.0:
+            image_copy = np.ones(shape=(image_shape[0], image_shape[1], 4))
+            image_copy[:, :, :3] = image
+            image = image_copy
+            background_color = [
+                *background_color,
+                1.0,
+            ]  # Extend the background color with the alpha channel
+        elif N_CHANNELS_BG < N_CHANNELS:
+            replacement_color = [*replacement_color, 1.0]
+
+        indices = np.argwhere(np.all(image[:, :] == background_color, axis=2))
+        image[indices[:, 0], indices[:, 1], :] = replacement_color
+        return image
 
     def crop_to_content(
         self, image, background_color=None, replace_background_color=None
@@ -441,6 +491,8 @@ class Paper_Plot:
 
         if os.path.exists(image):
             image = plt.imread(image)
+        elif isinstance(image, str):
+            raise Exception(f"`{image}` does not exist")
 
         ax.imshow(image)
         ax.tick_params(

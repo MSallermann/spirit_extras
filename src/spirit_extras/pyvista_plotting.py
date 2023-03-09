@@ -214,7 +214,10 @@ class Spin_Plotter:
         "camera_view_angle",
         "_preimages",
         "_plotter",
+        "_render_to_png",
         "default_render_args",
+        "_colormap",
+        "shape",
     ]
 
     def __init__(self, system):
@@ -237,6 +240,8 @@ class Spin_Plotter:
         self.camera_elevation = None
         self.camera_distance = None
         self.camera_view_angle = None
+        self._render_to_png = True
+        self.shape = (1, 1)
 
         self._preimages = []
 
@@ -373,9 +378,7 @@ class Spin_Plotter:
         self._point_cloud["spins_y"] = spin_system.spins[:, 1]
         self._point_cloud["spins_z"] = spin_system.spins[:, 2]
         self._point_cloud["spins"] = spin_system.spins
-        self._point_cloud["spins_rgba"] = get_rgba_colors(
-            spin_system.spins, opacity=1.0
-        )
+        self._point_cloud["spins_rgba"] = self._colormap(spin_system.spins)
 
         if self._delaunay:
             self._delaunay.copy_attributes(self._point_cloud)
@@ -384,21 +387,25 @@ class Spin_Plotter:
 
         if type(colormap) is str:
             if colormap.lower() == "hsv":
-                colormap = lambda spins: get_rgba_colors(spins, opacity, **kwargs)
+                self._colormap = lambda spins: get_rgba_colors(spins, opacity, **kwargs)
             elif colormap.lower() == "rb":
-                colormap = lambda spins: get_rgba_colors_red_blue(
+                self._colormap = lambda spins: get_rgba_colors_red_blue(
                     spins, opacity, **kwargs
                 )
             elif colormap.lower() == "rgb":
-                colormap = lambda spins: get_rgba_colors_red_green_blue(
+                self._colormap = lambda spins: get_rgba_colors_red_green_blue(
                     spins, opacity, **kwargs
                 )
 
-        self._point_cloud["spins_rgba"] = colormap(self.spin_system.spins)
+        self._point_cloud["spins_rgba"] = self._colormap(self.spin_system.spins)
 
     def add_mesh(self, mesh, render_args):
-        self.meshlist.append([mesh, render_args])
-        return self.meshlist[-1]
+        plotter = self.plotter()
+        plotter.add_mesh(mesh, **render_args)
+        # self.meshlist.append([mesh, render_args])
+        # if not self._plotter is None:
+        #     self._plotter
+        # return self.meshlist[-1]
 
     def clear_meshes(self):
         self.meshlist = []
@@ -418,14 +425,14 @@ class Spin_Plotter:
         else:
             return self.add_mesh(iso, render_args)
 
-    def arrows(self, geom=None, render_args=None):
+    def arrows(self, geom=None, render_args=None, factor=1):
 
         if render_args is None:
             render_args = self.default_render_args.copy()
 
         return self.add_mesh(
             arrows_from_point_cloud(
-                self._point_cloud, factor=1, scale=False, orient="spins", geom=geom
+                self._point_cloud, factor=factor, scale=False, orient="spins", geom=geom
             ),
             render_args,
         )
@@ -464,12 +471,23 @@ class Spin_Plotter:
             z_color=colors[2],
         )
 
-    def plotter(self, render_to_png=True, xvfb_wait=0):
-        if self._plotter is None:
+    def plotter(self, render_to_png=True, shape=None, xvfb_wait=0) -> pv.Plotter:
+        if shape is None:
+            shape = self.shape
+
+        new_plotter = False
+        if render_to_png != self._render_to_png or shape != self.shape:
+            new_plotter = True
+
+        if self._plotter is None or new_plotter:
+            self._render_to_png = render_to_png
+            self.shape = shape
+            if not self._plotter is None:
+                self._plotter.close()
             if render_to_png:
                 pv.start_xvfb(wait=xvfb_wait)
             self._plotter = pv.Plotter(
-                off_screen=render_to_png, shape=(1, 1), multi_samples=8
+                off_screen=render_to_png, shape=self.shape, multi_samples=8
             )
             self._plotter.window_size = self.resolution
         return self._plotter
@@ -479,12 +497,12 @@ class Spin_Plotter:
 
         self._set_camera(plotter)
 
-        for m, args in self.meshlist:
-            try:
-                plotter.add_mesh(m, **args)
-            except Exception as e:
-                print(f"Could not add_mesh {m}")
-                print(e)
+        # for m, args in self.meshlist:
+        #     try:
+        #         plotter.add_mesh(m, **args)
+        #     except Exception as e:
+        #         print(f"Could not add_mesh {m}")
+        #         print(e)
 
         if self.axes:
             self._axes(plotter)
@@ -518,12 +536,12 @@ class Spin_Plotter:
 
         self._set_camera(plotter)
 
-        for m, args in self.meshlist:
-            try:
-                plotter.add_mesh(m, **args)
-            except Exception as e:
-                print(f"Could not add_mesh {m}")
-                print(e)
+        # for m, args in self.meshlist:
+        #     try:
+        #         plotter.add_mesh(m, **args)
+        #     except Exception as e:
+        #         print(f"Could not add_mesh {m}")
+        #         print(e)
 
         if self.axes:
             self._axes(plotter)
