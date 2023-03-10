@@ -31,12 +31,19 @@ class Calculation_Folder_Test(unittest.TestCase):
             self.FOLDER, create=True, descriptor_file="subdir/params.json"
         )
 
+    @unittest.expectedFailure
+    def test_creation_fail_descriptor2(self):
+        # Should fail because .wrongext is not allowed
+        folder = calculation_folder.Calculation_Folder(
+            self.FOLDER, create=True, descriptor_file="params.wrongext"
+        )
+
     def test_different_desc_file(self):
         folder1 = calculation_folder.Calculation_Folder(
             self.FOLDER, create=True, descriptor_file="tmp/../params.json"
         )
         folder1["key"] = "value"
-        folder1.to_json()
+        folder1.to_desc()
 
         folder2 = calculation_folder.Calculation_Folder(
             self.FOLDER, descriptor_file="params.json"
@@ -53,7 +60,7 @@ class Calculation_Folder_Test(unittest.TestCase):
         folder["key4"] = dict(key1="a", key2=2)
 
         folder["weird_key#1"] = "val"
-        folder.to_json()
+        folder.to_desc()
 
     def test_dictionary(self):
         self.test_creation()
@@ -77,7 +84,7 @@ class Calculation_Folder_Test(unittest.TestCase):
         self.assertEqual(folder["key1"], "updated_old_value")
         self.assertEqual(folder["key5"], "new_value")
 
-        folder.to_json()
+        folder.to_desc()
 
     def test_format(self):
         self.test_creation()
@@ -143,13 +150,13 @@ class Calculation_Folder_Test(unittest.TestCase):
         folder["key3"] = [1, 2, 3]
         folder["key4"] = dict(key1="a", key2=2)
         folder["weird_key#1"] = "val"
-        folder.to_json("cool.json")
+        folder.to_desc("cool.json")
 
         # Read from json, write to yaml
         folder2 = calculation_folder.Calculation_Folder(
             self.FOLDER, create=False, descriptor_file="cool.json"
         )
-        folder2.to_yaml("cool.yaml")
+        folder2.to_desc("cool.yaml")
 
         # Read as yaml again, save as yaml
         folder3 = calculation_folder.Calculation_Folder(
@@ -176,8 +183,8 @@ class Calculation_Folder_Test(unittest.TestCase):
         self.assertEqual(dict(folder), dict(folder2))
 
         # Should raise an exception since now we have 'some_desc.yml', 'other_desc.yaml' and 'other_desc.json'
-        folder2.to_yaml("other_desc.yaml")
-        folder2.to_json("other_desc.json")
+        folder2.to_desc("other_desc.yaml")
+        folder2.to_desc("other_desc.json")
         with self.assertRaises(Exception):
             calculation_folder.Calculation_Folder(self.FOLDER)
 
@@ -191,7 +198,6 @@ class Calculation_Folder_Test(unittest.TestCase):
         second_folder = calculation_folder.Calculation_Folder(self.FOLDER2, True)
         second_folder["key"] = "value"
         second_folder.to_desc()
-        self.assertTrue(second_folder.use_json)
         self.assertTrue(
             os.path.exists(os.path.join(second_folder, second_folder.DEFAULT_DESC_FILE))
         )
@@ -203,6 +209,4 @@ class Calculation_Folder_Test(unittest.TestCase):
         second_folder2.to_desc()
 
         self.assertTrue(os.path.exists(os.path.join(second_folder, "desc.yml")))
-        self.assertTrue(not second_folder2.use_json)
-
         print(len(second_folder2.keys()))
