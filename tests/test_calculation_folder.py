@@ -140,32 +140,40 @@ class Calculation_Folder_Test(unittest.TestCase):
 
         self.assertEqual(folder + "/something", self.FOLDER + "/something")
 
-    def test_yaml(self):
-        # Read as yaml, write to json
-        folder = calculation_folder.Calculation_Folder(
-            self.FOLDER, create=True, descriptor_file="descriptor.yml"
-        )
-        folder["key1"] = 100112.123234
-        folder["key2"] = "string"
-        folder["key3"] = [1, 2, 3]
-        folder["key4"] = dict(key1="a", key2=2)
-        folder["weird_key#1"] = "val"
-        folder.to_desc("cool.json")
+    def test_descriptor_extensions(self):
 
-        # Read from json, write to yaml
-        folder2 = calculation_folder.Calculation_Folder(
-            self.FOLDER, create=False, descriptor_file="cool.json"
-        )
-        folder2.to_desc("cool.yaml")
+        for (
+            ext
+        ) in (
+            calculation_folder.Calculation_Folder.__allowed_descriptor_file_extensions__
+        ):
+            print(f"Testing descriptor extension: {ext}")
 
-        # Read as yaml again, save as yaml
-        folder3 = calculation_folder.Calculation_Folder(
-            self.FOLDER, create=True, descriptor_file="cool.yaml"
-        )
-        folder3.to_desc()
+            # Read as 'ext', write to json
+            folder = calculation_folder.Calculation_Folder(
+                self.FOLDER, create=True, descriptor_file=f"descriptor{ext}"
+            )
+            folder["key1"] = 100112.123234
+            folder["key2"] = "string"
+            folder["key3"] = [1, 2, 3]
+            folder["key4"] = dict(key1="a", key2=2)
+            folder["weird_key#1"] = "val"
+            folder.to_desc("cool.json")
 
-        self.assertEqual(dict(folder), dict(folder2))
-        self.assertEqual(dict(folder), dict(folder3))
+            # Read from json, write to 'ext'
+            folder2 = calculation_folder.Calculation_Folder(
+                self.FOLDER, create=False, descriptor_file="cool.json"
+            )
+            folder2.to_desc(f"cool{ext}")
+
+            # Read as 'ext' again, save as 'ext'
+            folder3 = calculation_folder.Calculation_Folder(
+                self.FOLDER, create=True, descriptor_file=f"cool{ext}"
+            )
+            folder3.to_desc()
+
+            self.assertEqual(dict(folder), dict(folder2))
+            self.assertEqual(dict(folder), dict(folder3))
 
     def test_infer_descriptor(self):
         folder = calculation_folder.Calculation_Folder(

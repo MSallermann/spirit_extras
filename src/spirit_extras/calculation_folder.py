@@ -1,12 +1,10 @@
-import json, os, pprint, shutil, yaml, glob
+import json, os, pprint, shutil, yaml, glob, toml
 
 
 class Calculation_Folder(os.PathLike, dict):
     """Represents one folder of a calculation."""
 
     DEFAULT_DESC_FILE = "descriptor.json"
-
-    __allowed_descriptor_file_extensions__ = [".json", ".yaml", ".yml"]
 
     __serializers__ = {
         ".yml": lambda dictionary, file_handle: file_handle.write(
@@ -18,13 +16,19 @@ class Calculation_Folder(os.PathLike, dict):
         ".json": lambda dictionary, file_handle: file_handle.write(
             json.dumps(dictionary, indent=4)
         ),
+        ".toml": lambda dictionary, file_handle: file_handle.write(
+            toml.dumps(dictionary)
+        ),
     }
 
     __parsers__ = {
-        ".yml": lambda self, file_handle: dict(yaml.safe_load(file_handle)),
-        ".yaml": lambda self, file_handle: dict(yaml.safe_load(file_handle)),
-        ".json": lambda self, file_handle: dict(json.load(file_handle)),
+        ".yml": lambda file_handle: dict(yaml.safe_load(file_handle)),
+        ".yaml": lambda file_handle: dict(yaml.safe_load(file_handle)),
+        ".json": lambda file_handle: dict(json.load(file_handle)),
+        ".toml": lambda file_handle: dict(toml.load(file_handle)),
     }
+
+    __allowed_descriptor_file_extensions__ = __parsers__.keys()
 
     def __init__(self, output_folder, create=False, descriptor_file=None):
         self.output_folder = os.path.normpath(os.path.abspath(output_folder))
@@ -136,7 +140,7 @@ class Calculation_Folder(os.PathLike, dict):
 
         if os.path.exists(descriptor_file):
             with open(descriptor_file, "r") as f:
-                super().__init__(self.__parsers__[ext](self, f))
+                super().__init__(self.__parsers__[ext](f))
 
     def to_desc(self, output_file=None):
         if output_file is None:
