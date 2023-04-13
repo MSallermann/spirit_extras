@@ -489,18 +489,20 @@ class Paper_Plot:
     def image_to_ax(self, ax, image):
         import os
 
-        if os.path.exists(image):
-            image = plt.imread(image)
-        elif isinstance(image, str):
-            raise Exception(f"`{image}` does not exist")
+        if isinstance(image, str):
+            if os.path.exists(image):
+                image = plt.imread(image)
+            else:
+                raise Exception(f"`{image}` does not exist")
 
-        ax.imshow(image)
         ax.tick_params(
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
         )
         ax.set_facecolor([0, 0, 0, 0])
         for k, s in ax.spines.items():
             s.set_visible(False)
+
+        return ax.imshow(image)
 
     def spine_axis(
         self,
