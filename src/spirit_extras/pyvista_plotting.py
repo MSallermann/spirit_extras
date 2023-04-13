@@ -201,6 +201,7 @@ class Spin_Plotter:
         "spin_system",
         "_point_cloud",
         "_delaunay",
+        "_xvfb_wait",
         "background_color",
         "axes",
         "meshlist",
@@ -226,6 +227,7 @@ class Spin_Plotter:
         self._point_cloud = create_point_cloud(system)
 
         self._delaunay = None
+        self._xvfb_wait = 0.5
 
         self.background_color = "white"
         self.axes = False
@@ -471,7 +473,7 @@ class Spin_Plotter:
             z_color=colors[2],
         )
 
-    def plotter(self, render_to_png=True, shape=None, xvfb_wait=0) -> pv.Plotter:
+    def plotter(self, render_to_png=True, shape=None) -> pv.Plotter:
         if shape is None:
             shape = self.shape
 
@@ -485,7 +487,7 @@ class Spin_Plotter:
             if not self._plotter is None:
                 self._plotter.close()
             if render_to_png:
-                pv.start_xvfb(wait=xvfb_wait)
+                pv.start_xvfb(wait=self._xvfb_wait)
             self._plotter = pv.Plotter(
                 off_screen=render_to_png, shape=self.shape, multi_samples=8
             )
