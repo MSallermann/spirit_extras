@@ -4,6 +4,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib as mpl
 import numpy as np
+from matplotlib.patches import FancyBboxPatch
 
 
 class Paper_Plot:
@@ -388,6 +389,15 @@ class Paper_Plot:
             transform=ax.transAxes,
             **kwargs,
         )
+
+    def add_box_around_image(self, ax, axes_image, **kwargs):
+        extent = axes_image.get_extent()
+        left, right, bottom, top = extent
+        width = right - left
+        height = top - bottom
+        fancy = FancyBboxPatch((left, bottom), width, height, **kwargs)
+        ax.add_patch(fancy)
+        return fancy
 
     def replace_background_color(self, image, replacement_color, background_color=None):
 
