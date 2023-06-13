@@ -4,6 +4,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib as mpl
 import numpy as np
+from matplotlib.patches import FancyBboxPatch
 
 
 class Paper_Plot:
@@ -389,6 +390,15 @@ class Paper_Plot:
             **kwargs,
         )
 
+    def add_box_around_image(self, ax, axes_image, **kwargs):
+        extent = axes_image.get_extent()
+        left, right, bottom, top = extent
+        width = right - left
+        height = top - bottom
+        fancy = FancyBboxPatch((left, bottom), width, height, **kwargs)
+        ax.add_patch(fancy)
+        return fancy
+
     def replace_background_color(self, image, replacement_color, background_color=None):
 
         N_CHANNELS = image.shape[-1]  # Number of channels in the picture
@@ -489,18 +499,20 @@ class Paper_Plot:
     def image_to_ax(self, ax, image):
         import os
 
-        if os.path.exists(image):
-            image = plt.imread(image)
-        elif isinstance(image, str):
-            raise Exception(f"`{image}` does not exist")
+        if isinstance(image, str):
+            if os.path.exists(image):
+                image = plt.imread(image)
+            else:
+                raise Exception(f"`{image}` does not exist")
 
-        ax.imshow(image)
         ax.tick_params(
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
         )
         ax.set_facecolor([0, 0, 0, 0])
         for k, s in ax.spines.items():
             s.set_visible(False)
+
+        return ax.imshow(image)
 
     def spine_axis(
         self,
