@@ -147,7 +147,9 @@ class Spin_System:
         return wrapper
 
     def __getitem__(self, key):
-        sliced_spin_system = Spin_System(self._positions[key], self.spins[key])
+        sliced_spin_system = self.copy()
+        sliced_spin_system._positions = self.positions[key]
+        sliced_spin_system.spins = self.spins[key]
         return sliced_spin_system
 
     def __str__(self):
@@ -408,29 +410,20 @@ class Spin_System:
 
     @require_order
     def a_slice(self, val):
-        result = self.shaped()[:, val, :, :, :]
-        result.n_cells = [1, self.n_cells[1], self.n_cells[2]]
-        result.bravais_vectors = self._bravais_vectors
-        result.n_cell_atoms = self.n_cell_atoms
-        result.unordered = False
+        result = self.shaped()[:, [val], :, :, :]
+        result._n_cells = [1, self.n_cells[1], self.n_cells[2]]
         return result.flattened()
 
     @require_order
     def b_slice(self, val):
-        result = self.shaped()[:, :, val, :, :]
-        result.n_cells = [self.n_cells[0], 1, self.n_cells[2]]
-        result.bravais_vectors = self._bravais_vectors
-        result.n_cell_atoms = self.n_cell_atoms
-        result.unordered = False
+        result = self.shaped()[:, :, [val], :, :]
+        result._n_cells = [self.n_cells[0], 1, self.n_cells[2]]
         return result.flattened()
 
     @require_order
     def c_slice(self, val):
-        result = self.shaped()[:, :, :, val, :]
-        result.n_cells = [self.n_cells[0], self.n_cells[1], 1]
-        result.bravais_vectors = self._bravais_vectors
-        result.n_cell_atoms = self.n_cell_atoms
-        result.unordered = False
+        result = self.shaped()[:, :, :, [val], :]
+        result._n_cells = [self.n_cells[0], self.n_cells[1], 1]
         return result.flattened()
 
 

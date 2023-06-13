@@ -178,9 +178,13 @@ class Data_Test(unittest.TestCase):
             idx = spin_system.idx(0, 3, 1, 3)
             self.assertTrue(np.all(spins[idx] == [-3, -3, -3]))
 
+            # abc slice
+            spin_system.a_slice(0)
+            spin_system.b_slice(1)
+            spin_system.c_slice(10)
+
             print(spin_system.center())
             print(spin_system.flattened().center())
-
             print(spin_system)
 
     def test_shorthand_constructors(self):
