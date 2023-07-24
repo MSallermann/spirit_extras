@@ -5,11 +5,17 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib as mpl
 import numpy as np
 from matplotlib.patches import FancyBboxPatch
+from PIL import Image
 
 
 class Paper_Plot:
+    """A class for laying out plots in a grid. (Plus some utilities)"""
+
     # one cm in inches
-    cm = 1 / 2.54
+    cm = 1.0 / 2.54
+
+    # one inch in inches
+    inch = 1.0
 
     # Annotations
     offset_u = 1.5 * np.array([0, 10])
@@ -41,17 +47,11 @@ class Paper_Plot:
         "axes.labelsize": 8,
     }
 
-    # __slots__ = ["annotate_letter", "width", "height", "ncols", "nrows"]
-
     def __init__(self, width, height=None, nrows=1, ncols=1, rcParams=None) -> None:
 
         self._ncols = ncols
         self._nrows = nrows
         self.width = width
-
-        if height is None:
-            height = width
-
         self.height = height
 
         if rcParams is None:
@@ -60,9 +60,6 @@ class Paper_Plot:
         mpl.rcParams.update(rcParams)
 
         self.annotate_letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        # self.annotate_letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".lower()
-        # self.annotate_letter = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
-        # self.annotate_letter = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
         self._horizontal_margins = [0.1, 0.1]
         self._vertical_margins = [0.1, 0.1]
@@ -78,6 +75,8 @@ class Paper_Plot:
         self.annotation_dict = {}
 
     def info_string(self):
+        """Returns a string with information about the plot."""
+
         res = "Paper_Plot\n"
         res += f"\t width  = {self.width:.3f} inch ({self.width / self.cm:.3f} cm)\n"
         res += f"\t height = {self.height:.3f} inch ({self.height / self.cm:.3f} cm)\n"
@@ -93,6 +92,7 @@ class Paper_Plot:
 
     @property
     def ncols(self):
+        """Number of columns."""
         return self._ncols
 
     @ncols.setter
@@ -104,6 +104,7 @@ class Paper_Plot:
 
     @property
     def nrows(self):
+        """Number of rows."""
         return self._nrows
 
     @nrows.setter
@@ -151,6 +152,7 @@ class Paper_Plot:
 
     @width_ratios.setter
     def width_ratios(self, value):
+        """Relative column width ratios."""
         if value is None:
             self._width_ratios = None
             return
@@ -162,6 +164,7 @@ class Paper_Plot:
 
     @property
     def height_ratios(self):
+        """Relative row height ratios."""
         return self._height_ratios
 
     @height_ratios.setter
@@ -177,6 +180,7 @@ class Paper_Plot:
 
     @property
     def wspace(self):
+        """Space between columns as a fraction of the average column width."""
         return self._wspace
 
     @wspace.setter
@@ -185,6 +189,7 @@ class Paper_Plot:
 
     @property
     def hspace(self):
+        """Space between rows as a fraction of the average row height."""
         return self._hspace
 
     @hspace.setter
@@ -193,6 +198,7 @@ class Paper_Plot:
 
     @property
     def horizontal_margins(self):
+        """Horizontal margins (left and right) as fraction of figure width"""
         return self._horizontal_margins.copy()
 
     @horizontal_margins.setter
@@ -208,6 +214,7 @@ class Paper_Plot:
 
     @property
     def vertical_margins(self):
+        """Horizontal margins (bottom and top) as fraction of figure height"""
         return self._vertical_margins.copy()
 
     @vertical_margins.setter
@@ -222,7 +229,7 @@ class Paper_Plot:
             )
 
     def height_from_aspect_ratio(self, aspect_ratio):
-        """The width of the figure (including all margins) is fixed. The aspect ratio is the aspect ratio of all content, excluding hspace and wspace"""
+        """The width of the figure (including all margins) is fixed. The aspect ratio is the aspect ratio of all content, excluding hspace, wspace and margins"""
 
         # Deal with width
         rel_margin_w = sum(self.horizontal_margins)
@@ -250,12 +257,11 @@ class Paper_Plot:
         )
         height_prefactor = rel_height_minus_margins - rel_total_hspace_between_subplots
 
-        # aspect_ratio = self.width/self.height * width_prefactor / height_prefactor
         self.height = self.width / aspect_ratio * width_prefactor / height_prefactor
 
     def apply_absolute_margins(
         self,
-        aspect_ratio=1.62,
+        aspect_ratio=None,
         abs_hspace=0.5 * cm,
         abs_wspace=0.5 * cm,
         abs_vertical_margins=[0.15 * cm, 0.15 * cm],
@@ -265,9 +271,36 @@ class Paper_Plot:
         abs_content_width=None,
         abs_content_height=None,
     ):
+        """Set the layout of the figure in *absolute* units. All lengths are given in inches. Call this *before* fig() and gs().
+
+        Args:
+            aspect_ratio (float, optional): Aspect ratio of only the content of the entire figure, meaning all hspace, wspace and margins are discarded for the computation of the aspect ratio. Defaults to 1.62. Set to None to use different method to compute the conent height.
+            abs_hspace (float): The space between each row of the grid. Defaults to 0.5*cm.
+            abs_wspace (float): The space between each column of the grid. Defaults to 0.5*cm.
+            abs_vertical_margins (list): Left and right margins. Defaults to [0.15 * cm, 0.15 * cm].
+            abs_horizontal_margins (list): Bottom and top margins. Defaults to [0.15 * cm, 0.15 * cm].
+            abs_heights (list, optional): Heights of the rows. Defaults to None. Negative values will be used as relative weights.
+            abs_widths (list, optional): Widths of the columns. Defaults to None. Negative values will be used as relative weights.
+            abs_content_width (float, optional): Absolute width of the content. !WARNING will recompute the total width of the figure, based on wspace and margins. It is usually better to keep the width fixed. Defaults to None.
+            abs_content_height (float, optional): Absolute height of the content. This will only be used if aspect_ratio is None. !WARNING will recompute the total height of the figure.
+        """
+
+        # Convert arguments to np.arrayss
         abs_horizontal_margins = np.array(abs_horizontal_margins, dtype=float)
         abs_vertical_margins = np.array(abs_vertical_margins, dtype=float)
 
+        assert abs_horizontal_margins.shape == (2,)
+        assert abs_vertical_margins.shape == (2,)
+
+        if not abs_widths is None:
+            abs_widths = np.array(abs_widths, dtype=float)
+            assert abs_widths.shape == (self.ncols,)
+
+        if not abs_heights is None:
+            abs_heights = np.array(abs_heights, dtype=float)
+            assert abs_heights.shape == (self.nrows,)
+
+        # Compute the absolute space, taken up by the margins
         abs_margin_w = np.sum(abs_horizontal_margins)
         abs_margin_h = np.sum(abs_vertical_margins)
 
@@ -278,28 +311,35 @@ class Paper_Plot:
         else:
             self.width = (
                 abs_content_width + abs_wspace * (self.ncols - 1) + abs_margin_w
-            )
+            )  # Re-compute the figure widths
 
-        if abs_content_width <= 0:
+        if abs_content_width <= 0.0:
             raise Exception(
-                "horizontal margins and wspace are too big. There is no space left for the content."
+                "Horizontal margins and wspace are too big. There is no space left for the content."
             )
 
+        # Deal with absolute widths
         if not abs_widths is None:
-            abs_widths = np.array(abs_widths)
-
             self.width_ratios = abs_widths / abs_content_width
 
-            remaining_width = abs_content_width - np.sum(abs_widths[abs_widths >= 0])
+            if (
+                len(abs_widths[abs_widths < 0.0]) == 0
+            ):  # If there are no relative widths left to distribute, we have no slack and check that the sum of absolute widths matches the conent width
+                if not np.isclose(np.sum(abs_widths), abs_content_width):
+                    raise Exception(
+                        "The absolute widths do not match the expected width of the plot content. You should make at least one of them relative by specifying a negative number."
+                    )
 
-            if remaining_width < 0:
+            # Compute the remaining width, to be distributed according to the relative weights
+            remaining_width = abs_content_width - np.sum(abs_widths[abs_widths >= 0.0])
+            if remaining_width < 0.0:
                 raise Exception("Absolute widths are larger than total width")
 
-            total_weight_of_relative_widths = np.sum(abs_widths[abs_widths < 0])
+            total_weight_of_relative_widths = np.sum(abs_widths[abs_widths < 0.0])
 
-            # divide the remaining width according to the relative width ratios
+            # Divide the remaining width according to the relative width ratios
             for idx_w, w in enumerate(abs_widths):
-                if w < 0:
+                if w < 0.0:
                     self.width_ratios[idx_w] = (
                         w
                         / total_weight_of_relative_widths
@@ -307,45 +347,73 @@ class Paper_Plot:
                         / abs_content_width
                     )
 
+        # Check if overspecified
+        height_specifiers = []
+        if not aspect_ratio is None:
+            height_specifiers.append("aspect_ratio")
+        if not abs_content_height is None:
+            height_specifiers.append("abs_content_height")
+        if not self.height is None:
+            height_specifiers.append("height")
+        if not abs_heights is None:
+            if np.all(abs_heights >= 0.0):
+                height_specifiers.append(
+                    "list of abs_heights without any relative weights"
+                )
+
+        if len(height_specifiers) > 1:
+            raise Exception(
+                f"The height of the plot is overspecified, because you have set {height_specifiers})"
+            )
+
+        # Decide on the content height
         if not aspect_ratio is None:
             abs_content_height = abs_content_width / aspect_ratio
         elif not abs_content_height is None:
             abs_content_height = abs_content_height
-        else:
+        elif not abs_heights is None:
             if np.all(
-                np.array(abs_heights) >= 0
+                abs_heights >= 0.0
             ):  # In some cases the abs content height can be computed from the given heights
                 abs_content_height = np.sum(abs_heights)
-            else:
-                abs_content_height = (
-                    self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
+        elif not self.height is None:
+            abs_content_height = (
+                self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
+            )
+            if abs_content_height < 0:
+                raise Exception(
+                    "Absolute height for the content of figure is smaller than zero.\n"
                 )
-
-                if abs_content_height < 0:
-                    raise Exception(
-                        "Absolute height for content of figure is smaller than zero.\n"
-                    )
-                print(
-                    "WARNING: Using the currently set height to compute the absolute content height."
-                )
+            print(
+                "WARNING: Using the currently set height to compute the absolute content height."
+            )
+        else:
+            raise Exception("Cannot determine height of the plot!")
 
         if not abs_heights is None:
-            abs_heights = np.array(abs_heights)
+            if (
+                len(abs_heights[abs_heights < 0.0]) == 0
+            ):  # If there are no relative heights to distribute, we have no slack and check that the sum of absolute widths matches the conent width
+                if not np.isclose(np.sum(abs_heights), abs_content_height):
+                    raise Exception(
+                        "The sum of the absolute heights does not match the expected height of the plot *content*. You should make at least one of them relative by specifying a negative number."
+                    )
 
             self.height_ratios = abs_heights / abs_content_height
 
+            # Compute the remaining height to be distributed by relative weight
             remaining_height = abs_content_height - np.sum(
-                abs_heights[abs_heights >= 0]
+                abs_heights[abs_heights >= 0.0]
             )
 
-            if remaining_height < 0:
+            if remaining_height < 0.0:
                 raise Exception("Absolute heights are larger than total height")
 
             total_weight_of_relative_heights = np.sum(abs_heights[abs_heights < 0])
 
             # divide the remaining height according to the relative height ratios
             for idx_h, h in enumerate(abs_heights):
-                if h < 0:
+                if h < 0.0:
                     self.height_ratios[idx_h] = (
                         h
                         / total_weight_of_relative_heights
@@ -353,33 +421,51 @@ class Paper_Plot:
                         / abs_content_height
                     )
 
+        # Compute the relative quantities that gridpsec needs
         self.hspace = abs_hspace / abs_content_height * self.nrows
         self.wspace = abs_wspace / abs_content_width * self.ncols
         self.height = abs_content_height + abs_margin_h + abs_hspace * (self.nrows - 1)
         self.horizontal_margins = abs_horizontal_margins / self.width
         self.vertical_margins = abs_vertical_margins / self.height
 
+    def reset(self):
+        """Resets the internal fig and gs to None"""
+        self._fig = None
+        self._gs = None
+
     def fig(self):
-        self._fig = plt.figure(figsize=(self.width, self.height))
+        """Get the underlying figure object"""
+        if self._fig is None:
+            self._fig = plt.figure(figsize=(self.width, self.height))
         return self._fig
 
     def gs(self):
-        self._gs = GridSpec(
-            figure=self._fig,
-            nrows=self.nrows,
-            ncols=self.ncols,
-            left=self.horizontal_margins[0],
-            bottom=self.vertical_margins[0],
-            right=1 - self.horizontal_margins[1],
-            top=1 - self.vertical_margins[1],
-            hspace=self.hspace,
-            wspace=self.wspace,
-            width_ratios=self.width_ratios,
-            height_ratios=self.height_ratios,
-        )
+        """Get the underlying GridSpec object"""
+        if self._gs is None:
+            self._gs = GridSpec(
+                figure=self._fig,
+                nrows=self.nrows,
+                ncols=self.ncols,
+                left=self.horizontal_margins[0],
+                bottom=self.vertical_margins[0],
+                right=1.0 - self.horizontal_margins[1],
+                top=1.0 - self.vertical_margins[1],
+                hspace=self.hspace,
+                wspace=self.wspace,
+                width_ratios=self.width_ratios,
+                height_ratios=self.height_ratios,
+            )
         return self._gs
 
     def annotate(self, ax, text, pos=[0, 0.98], fontsize=8, **kwargs):
+        """Annotate an ax with some text. Wrapper around ax.text.
+
+        Args:
+            ax (plt.ax): the ax
+            text (str): the text
+            pos (list, optional): position. Defaults to [0, 0.98].
+            fontsize (int, optional): fontsize. Defaults to 8.
+        """
         ax.text(
             *pos,
             text,
@@ -391,6 +477,15 @@ class Paper_Plot:
         )
 
     def add_box_around_image(self, ax, axes_image, **kwargs):
+        """Adds a box patch around an axis.
+
+        Args:
+            ax (plt.ax): The ax
+            axes_image (_type_): The image
+
+        Returns:
+            FancyBboxPatch: Returns the box patch
+        """
         extent = axes_image.get_extent()
         left, right, bottom, top = extent
         width = right - left
@@ -399,7 +494,22 @@ class Paper_Plot:
         ax.add_patch(fancy)
         return fancy
 
-    def replace_background_color(self, image, replacement_color, background_color=None):
+    @staticmethod
+    def open_image(path):
+        return np.array(Image.open(path))
+
+    @staticmethod
+    def replace_background_color(image, replacement_color, background_color=None):
+        """Replaced the backgroudn color of an image, specified as a numpy array.
+
+        Args:
+            image (np.Array): The image array
+            replacement_color (the color): The color wich replaces the background color.
+            background_color (the background color, optional): The backgroudn color. If None it is inferred from the corners. Defaults to None.
+
+        Returns:
+            np.Array: the new image array
+        """
 
         N_CHANNELS = image.shape[-1]  # Number of channels in the picture
         image_shape = image.shape
@@ -436,9 +546,9 @@ class Paper_Plot:
         image[indices[:, 0], indices[:, 1], :] = replacement_color
         return image
 
-    def crop_to_content(
-        self, image, background_color=None, replace_background_color=None
-    ):
+    @staticmethod
+    def crop_to_content(image, background_color=None, replace_background_color=None):
+        """Crops an image array to its content."""
         N_CHANNELS = image.shape[-1]  # Number of channels in the picture
         image_shape = image.shape
 
@@ -486,7 +596,9 @@ class Paper_Plot:
 
         return image[lower_height:upper_height, lower_width:upper_width, :]
 
-    def crop(self, image, width, height=None):
+    @staticmethod
+    def crop(image, width, height=None):
+        """Crops an image array to a give width and height (towards the center)"""
         if height is None:
             height = image.shape[0]
         o = [int(image.shape[0] / 2), int(image.shape[1] / 2)]
@@ -496,12 +608,48 @@ class Paper_Plot:
         upper_height = lower_height + height
         return image[lower_height:upper_height, lower_width:upper_width, :]
 
-    def image_to_ax(self, ax, image):
+    def create_inset_axis(
+        self,
+        containing_ax,
+        rel_width=0.5,
+        rel_height=0.5,
+        margin_x=0.0,
+        margin_y=0.0,
+        x_align="left",
+        y_align="bottom",
+    ):
+        """Creates an axis for an inset"""
+        pos = containing_ax.get_position(self._fig)
+
+        w = pos.x1 - pos.x0
+        h = pos.y1 - pos.y0
+
+        def helper(old_var0, old_var1, align, wh, rel_width_height, margin_xy):
+            if align == "left" or align == "bottom":
+                new_var0 = old_var0 + margin_xy * rel_width_height * wh
+                new_var1 = new_var0 + rel_width_height * wh
+            elif align == "right" or align == "top":
+                new_var1 = old_var1 - margin_xy * rel_width_height * wh
+                new_var0 = new_var1 - rel_width_height * wh
+            elif align == "center":
+                new_var0 = old_var0 + 0.5 * (1.0 - rel_width_height) * wh
+                new_var1 = old_var1 - 0.5 * (1.0 - rel_width_height) * wh
+            else:
+                raise Exception(f"unknown align: {align}")
+            return new_var0, new_var1
+
+        pos.x0, pos.x1 = helper(pos.x0, pos.x1, x_align, w, rel_width, margin_x)
+        pos.y0, pos.y1 = helper(pos.y0, pos.y1, y_align, h, rel_height, margin_y)
+
+        return self._fig.add_axes(pos)
+
+    @staticmethod
+    def image_to_ax(ax, image):
         import os
 
         if isinstance(image, str):
             if os.path.exists(image):
-                image = plt.imread(image)
+                image = Paper_Plot.open_image(image)
             else:
                 raise Exception(f"`{image}` does not exist")
 
