@@ -150,8 +150,6 @@ class Paper_Plot_Test(unittest.TestCase):
             abs_wspace=1.0 * Paper_Plot.cm * 1,
             abs_horizontal_margins=np.ones(2) * Paper_Plot.cm * 1,
             abs_vertical_margins=np.ones(2) * Paper_Plot.cm * 1,
-            # abs_content_width  = 20 * Paper_Plot.cm,
-            abs_content_height=10 * Paper_Plot.cm,
             abs_widths=[11 * Paper_Plot.cm, -1, -1, -1],
             abs_heights=[5 * Paper_Plot.cm, 5 * Paper_Plot.cm],
         )
