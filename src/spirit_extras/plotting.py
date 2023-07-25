@@ -280,8 +280,8 @@ class Paper_Plot:
             aspect_ratio (float, optional): Aspect ratio of only the content of the entire figure, meaning all hspace, wspace and margins are discarded for the computation of the aspect ratio. Defaults to 1.62. Set to None to use different method to compute the conent height.
             abs_hspace (float): The space between each row of the grid. Defaults to 0.5*cm.
             abs_wspace (float): The space between each column of the grid. Defaults to 0.5*cm.
-            abs_vertical_margins (list): Left and right margins. Defaults to [0.15 * cm, 0.15 * cm].
-            abs_horizontal_margins (list): Bottom and top margins. Defaults to [0.15 * cm, 0.15 * cm].
+            abs_vertical_margins (list): Bottom and top margins. Defaults to [0.15 * cm, 0.15 * cm].
+            abs_horizontal_margins (list): Left and right margins. Defaults to [0.15 * cm, 0.15 * cm].
             abs_heights (list, optional): Heights of the rows. Defaults to None. Negative values will be used as relative weights.
             abs_widths (list, optional): Widths of the columns. Defaults to None. Negative values will be used as relative weights.
             abs_content_width (float, optional): Absolute width of the content. !WARNING will recompute the total width of the figure, based on wspace and margins. It is usually better to keep the width fixed. Defaults to None.
@@ -384,7 +384,7 @@ class Paper_Plot:
             abs_content_height = (
                 self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
             )
-            if abs_content_height < 0:
+            if abs_content_height < 0.0:
                 raise Exception(
                     "Absolute height for the content of figure is smaller than zero.\n"
                 )
@@ -643,7 +643,20 @@ class Paper_Plot:
         x_align="left",
         y_align="bottom",
     ):
-        """Creates an axis for an inset"""
+        """Creates an axis for an inset.
+
+        Args:
+            containing_ax (plt.Axes): The Axes object relative to which to place the inset
+            rel_width (float, optional): Width of the inset as a fraction of the containing ax. Defaults to 0.5.
+            rel_height (float, optional): Height of the inset as a fraction of the containing ax. Defaults to 0.5.
+            margin_x (float, optional): X margin of the inset as a fraction of the containing ax. Defaults to 0.0.
+            margin_y (float, optional): Y margin of the inset as a fraction of the containing ax. Defaults to 0.0.
+            x_align (str, optional): Where to align the inset horizontally. One of ["left", "right", "center"]. Defaults to "left".
+            y_align (str, optional): Where to align the inset horizontally. One of ["bottom", "top", "center"]. Defaults to "bottom".
+
+        Returns:
+            plt.Axes: The inset Axes object
+        """
         pos = containing_ax.get_position(self._fig)
 
         w = pos.x1 - pos.x0
@@ -968,7 +981,6 @@ def gradient_line(ax, x, y, c, lw=2.0, cmap="viridis", c_norm=None, n_inter=10):
         lc.set_linewidth(lw)
 
         ax.add_collection(lc)
-        # ax.autoscale()
     except:
         pass
 
