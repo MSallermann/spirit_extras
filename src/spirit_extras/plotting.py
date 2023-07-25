@@ -79,7 +79,10 @@ class Paper_Plot:
 
         res = "Paper_Plot\n"
         res += f"\t width  = {self.width:.3f} inch ({self.width / self.cm:.3f} cm)\n"
-        res += f"\t height = {self.height:.3f} inch ({self.height / self.cm:.3f} cm)\n"
+        if self.height is not None:
+            res += (
+                f"\t height = {self.height:.3f} inch ({self.height / self.cm:.3f} cm)\n"
+            )
         res += f"\t ncols  = {self.ncols}\n"
         res += f"\t nrows  = {self.nrows}\n"
         res += f"\t wspace = {self.wspace}\n"
@@ -347,6 +350,7 @@ class Paper_Plot:
                         / abs_content_width
                     )
 
+        # Decide on the content height
         # Check if overspecified
         height_specifiers = []
         if not aspect_ratio is None:
@@ -366,7 +370,6 @@ class Paper_Plot:
                 f"The height of the plot is overspecified, because you have set {height_specifiers})"
             )
 
-        # Decide on the content height
         if not aspect_ratio is None:
             abs_content_height = abs_content_width / aspect_ratio
         elif not abs_content_height is None:
@@ -376,7 +379,8 @@ class Paper_Plot:
                 abs_heights >= 0.0
             ):  # In some cases the abs content height can be computed from the given heights
                 abs_content_height = np.sum(abs_heights)
-        elif not self.height is None:
+
+        if not self.height is None and abs_content_height is None:
             abs_content_height = (
                 self.height - abs_margin_h - abs_hspace * (self.nrows - 1)
             )
@@ -387,7 +391,8 @@ class Paper_Plot:
             print(
                 "WARNING: Using the currently set height to compute the absolute content height."
             )
-        else:
+
+        if abs_content_height is None:
             raise Exception("Cannot determine height of the plot!")
 
         if not abs_heights is None:
@@ -661,6 +666,17 @@ class Paper_Plot:
             s.set_visible(False)
 
         return ax.imshow(image)
+
+    @staticmethod
+    def clear_spines(ax):
+        ax.set_facecolor([0, 0, 0, 0])
+        ax.tick_params(
+            axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
+        )
+        for k in ["left", "right", "top", "bottom"]:
+            s = ax.spines[k]
+            s.set_visible(False)
+        return ax
 
     def spine_axis(
         self,
