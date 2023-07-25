@@ -462,21 +462,41 @@ class Paper_Plot:
             )
         return self._gs
 
-    def annotate(self, ax, text, pos=[0, 0.98], fontsize=8, **kwargs):
+    @staticmethod
+    def label_subplot(ax, text, pad_x=0.0, pad_y=0.025, **kwargs):
+        """Labels a subplot at the left upper corner. Wrapper around ax.text"""
+
+        if pad_x >= 0.0:
+            ha = "left"
+        else:
+            ha = "right"
+
+        if pad_y >= 0.0:
+            va = "bottom"
+        else:
+            va = "top"
+
+        ax.text(
+            x=pad_x,
+            y=1.0 + pad_y,
+            s=text,
+            transform=ax.transAxes,
+            ha=ha,
+            va=va,
+            **kwargs,
+        )
+
+    @staticmethod
+    def annotate(ax, text, pos=[0, 0.98], **kwargs):
         """Annotate an ax with some text. Wrapper around ax.text.
 
         Args:
             ax (plt.ax): the ax
             text (str): the text
-            pos (list, optional): position. Defaults to [0, 0.98].
-            fontsize (int, optional): fontsize. Defaults to 8.
         """
         ax.text(
             *pos,
             text,
-            fontsize=fontsize,
-            horizontalalignment="left",
-            verticalalignment="top",
             transform=ax.transAxes,
             **kwargs,
         )
