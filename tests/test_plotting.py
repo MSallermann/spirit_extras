@@ -172,3 +172,20 @@ class Paper_Plot_Test(unittest.TestCase):
             os.path.join(self.OUTPUT_FOLDER, "test_fig_abs_margins_advanced.png"),
             dpi=300,
         )
+
+    def test_misc(self):
+        image = plt.imread(os.path.join(self.IMAGE_FOLDER, "hopfion_cut_vertical.png"))
+        image_crop = Paper_Plot.crop(
+            image,
+            left=10,
+            right=500,
+            top=500,
+            bottom=500
+        )
+        plt.imsave(os.path.join(self.OUTPUT_FOLDER, "cropped_hopfion_test_2.png"), image_crop)
+
+        image = plt.imread(os.path.join(self.IMAGE_FOLDER, "circle.png"))
+        image_crop = Paper_Plot.crop_to_content(
+            image
+        )
+        plt.imsave(os.path.join(self.OUTPUT_FOLDER, "cropped_circle.png"), image_crop)

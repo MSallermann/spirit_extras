@@ -85,10 +85,10 @@ class Paper_Plot:
             )
         res += f"\t ncols  = {self.ncols}\n"
         res += f"\t nrows  = {self.nrows}\n"
-        res += f"\t wspace = {self.wspace}\n"
-        res += f"\t hspace = {self.hspace}\n"
-        res += f"\t horizontal_margins = {self.horizontal_margins}\n"
-        res += f"\t vertical_margins = {self.vertical_margins}\n"
+        res += f"\t wspace = {self.wspace:.3f}\n"
+        res += f"\t hspace = {self.hspace:.3f}\n"
+        res += f"\t horizontal_margins =  {self.horizontal_margins[0]:.3f}, {self.horizontal_margins[1]:.3f}\n"
+        res += f"\t vertical_margins = {self.vertical_margins[0]:.3f}, {self.vertical_margins[1]:.3f}\n"
         res += f"\t width_ratios = {self.width_ratios}\n"
         res += f"\t height_ratios = {self.height_ratios}\n"
         return res
@@ -619,19 +619,30 @@ class Paper_Plot:
             indices = np.argwhere(np.all(image[:, :] == background_color, axis=2))
             image[indices[:, 0], indices[:, 1], :] = replace_background_color
 
-        return image[lower_height:upper_height, lower_width:upper_width, :]
+        return image[lower_height : upper_height + 1, lower_width : upper_width + 1, :]
 
     @staticmethod
-    def crop(image, width, height=None):
-        """Crops an image array to a give width and height (towards the center)"""
-        if height is None:
-            height = image.shape[0]
-        o = [int(image.shape[0] / 2), int(image.shape[1] / 2)]
-        lower_height = o[0] - int(height / 2)
-        lower_width = o[1] - int(width / 2)
-        upper_width = lower_width + width
-        upper_height = lower_height + height
-        return image[lower_height:upper_height, lower_width:upper_width, :]
+    def crop(image, left=0, right=0, top=0, bottom=0):
+        """Crops an image by removing pixels from the left, right, top and bottom"""
+        assert left >= 0 and right >= 0 and top >= 0 and bottom >= 0
+
+        height_old = image.shape[0]
+        height_new = height_old - top - bottom
+
+        width_old = image.shape[1]
+        width_new = width_old - left - right
+
+        if height_new <= 0:
+            raise Exception(
+                "Cropping too much at top and/or bottom. No pixels remaining."
+            )
+
+        if width_new <= 0:
+            raise Exception(
+                "Cropping too much at left and/or right. No pixels remaining."
+            )
+
+        return image[top : height_old - bottom, left : width_old - right, :]
 
     def create_inset_axis(
         self,
