@@ -6,11 +6,10 @@ from .plotting import (
 import numpy as np
 import os
 import json
+import pyvista as pv
 
 
 def create_point_cloud(spin_system):
-    import pyvista as pv
-
     point_cloud = pv.PolyData(spin_system.positions)
     point_cloud["spins_x"] = spin_system.spins[:, 0]
     point_cloud["spins_y"] = spin_system.spins[:, 1]
@@ -67,8 +66,6 @@ def isosurface_from_delaunay(delaunay, isovalue=0, scalars_key="spins_z"):
 def arrows_from_point_cloud(
     point_cloud, factor=1, scale=False, orient="spins", geom=None
 ):
-    import pyvista as pv
-
     if geom is None:
         geom = pv.Cone(radius=0.25, resolution=9)
 
@@ -92,35 +89,8 @@ def create_pre_image(
     return pv.Spline(positions).tube(radius=0.3)
 
 
-def save_to_png(image_file_name, mesh_list):
-    import pyvista as pv
-
-    pv.start_xvfb()
-    plotter = pv.Plotter(off_screen=True, shape=(1, 1))
-
-    for m in mesh_list:
-        plotter.add_mesh(
-            m,
-            scalars="spins_rgba",
-            rgb=True,
-            specular=0.7,
-            ambient=0.4,
-            specular_power=5,
-            smooth_shading=True,
-            show_scalar_bar=False,
-            show_edges=False,
-            metallic=True,
-        )
-
-    plotter.set_background("white")
-    plotter.add_axes(color="black", line_width=6)
-
-    plotter.show(screenshot=file_name + ".png")
-
-
 def plot_color_sphere(image_file_name, spin_to_rgba_func):
     import pyvista as pv
-    import vtk
 
     sphere = pv.Sphere(
         radius=1.0,
@@ -196,30 +166,7 @@ import pyvista as pv
 
 
 class Spin_Plotter:
-
-    __slots__ = [
-        "spin_system",
-        "_point_cloud",
-        "_delaunay",
-        "_xvfb_wait",
-        "background_color",
-        "axes",
-        "meshlist",
-        "resolution",
-        "camera_position",
-        "camera_up",
-        "camera_focal_point",
-        "camera_azimuth",
-        "camera_elevation",
-        "camera_distance",
-        "camera_view_angle",
-        "_preimages",
-        "_plotter",
-        "_render_to_png",
-        "default_render_args",
-        "_colormap",
-        "shape",
-    ]
+    """A class to create pyvista plots of spin systems."""
 
     def __init__(self, system):
         self.spin_system = system
@@ -309,8 +256,6 @@ class Spin_Plotter:
         self.camera_position = look_at + distance * direction
         self.camera_focal_point = look_at - 2 * distance * direction
 
-        # self.camera_focal_point = self.spin_system.center()
-
     def rotate_camera(self, axis, angle):
         from scipy.spatial.transform import Rotation
 
@@ -363,7 +308,6 @@ class Spin_Plotter:
             plotter.camera.distance = self.camera_distance
         if not self.camera_view_angle is None:
             plotter.camera.view_angle = self.camera_view_angle
-        # plotter.camera_set = True
 
     def compute_delaunay(self):
         self._delaunay = delaunay(self._point_cloud)
@@ -386,7 +330,6 @@ class Spin_Plotter:
             self._delaunay.copy_attributes(self._point_cloud)
 
     def colormap(self, colormap, opacity=1.0, **kwargs):
-
         if type(colormap) is str:
             if colormap.lower() == "hsv":
                 self._colormap = lambda spins: get_rgba_colors(spins, opacity, **kwargs)
@@ -402,17 +345,11 @@ class Spin_Plotter:
         self._point_cloud["spins_rgba"] = self._colormap(self.spin_system.spins)
 
     def add_mesh(self, mesh, render_args):
-        plotter = self.plotter()
-        plotter.add_mesh(mesh, **render_args)
-        # self.meshlist.append([mesh, render_args])
-        # if not self._plotter is None:
-        #     self._plotter
-        # return self.meshlist[-1]
+        self.meshlist.append([mesh, render_args])
+        return self.meshlist[-1]
 
     def clear_meshes(self):
         self.meshlist = []
-        if not self._plotter is None:
-            self._plotter.clear()
 
     def isosurface(self, isovalue, scalars_key, render_args=None):
         if not self._delaunay:
@@ -428,7 +365,6 @@ class Spin_Plotter:
             return self.add_mesh(iso, render_args)
 
     def arrows(self, geom=None, render_args=None, factor=1):
-
         if render_args is None:
             render_args = self.default_render_args.copy()
 
@@ -492,31 +428,32 @@ class Spin_Plotter:
                 off_screen=render_to_png, shape=self.shape, multi_samples=8
             )
             self._plotter.window_size = self.resolution
+
+        self._set_camera(self._plotter)
+
+        if self.axes:
+            self._axes(self._plotter)
+
+        self.transparent_background = False
+        if not self.background_color is None:
+            if self.background_color.lower() == "transparent":
+                self.transparent_background = True
+            else:
+                self._plotter.set_background(self.background_color)
+
         return self._plotter
 
     def show(self, save_camera_file=None):
         plotter = self.plotter(render_to_png=False)
 
-        self._set_camera(plotter)
+        for m, args in self.meshlist:
+            try:
+                plotter.add_mesh(m, **args)
+            except Exception as e:
+                print(f"Could not add_mesh {m}")
+                print(e)
 
-        # for m, args in self.meshlist:
-        #     try:
-        #         plotter.add_mesh(m, **args)
-        #     except Exception as e:
-        #         print(f"Could not add_mesh {m}")
-        #         print(e)
-
-        if self.axes:
-            self._axes(plotter)
-
-        transparent_background = False
-        if not self.background_color is None:
-            if self.background_color.lower() == "transparent":
-                transparent_background = True
-            else:
-                plotter.set_background(self.background_color)
-
-        plotter.show()
+        self._plotter.show()
 
         if save_camera_file is not None:
             camera_dict = dict(
@@ -536,27 +473,15 @@ class Spin_Plotter:
 
         plotter = self.plotter()
 
-        self._set_camera(plotter)
-
-        # for m, args in self.meshlist:
-        #     try:
-        #         plotter.add_mesh(m, **args)
-        #     except Exception as e:
-        #         print(f"Could not add_mesh {m}")
-        #         print(e)
-
-        if self.axes:
-            self._axes(plotter)
-
-        transparent_background = False
-        if not self.background_color is None:
-            if self.background_color.lower() == "transparent":
-                transparent_background = True
-            else:
-                plotter.set_background(self.background_color)
+        for m, args in self.meshlist:
+            try:
+                plotter.add_mesh(m, **args)
+            except Exception as e:
+                print(f"Could not add_mesh {m}")
+                print(e)
 
         plotter.screenshot(
-            file_name + ".png", transparent_background=transparent_background
+            file_name + ".png", transparent_background=self.transparent_background
         )
 
     def __del__(self):
