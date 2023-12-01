@@ -195,12 +195,7 @@ class Spin_System:
 
     @property
     def nos(self):
-        if self.is_flat():
-            return len(self.spins)
-        else:
-            return (
-                self.n_cells[0] * self.n_cells[1] * self.n_cells[2] * self.n_cell_atoms
-            )
+        return int(np.prod(self.spins.shape) / 3)
 
     @property
     def unordered(self):
