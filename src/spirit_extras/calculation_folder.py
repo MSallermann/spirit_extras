@@ -77,7 +77,6 @@ class Calculation_Folder(os.PathLike, dict):
                         if len(v) == 1:
                             descriptor_file_constructor_argument = v[0]
                 else:
-
                     exception_msg = f"Error when trying to infer descriptor file. Multiple *.json, *.yaml or *.yml files found in {self}:\n"
                     for ext, v in paths.items():
                         exception_msg += f"    {ext}: {v}\n"
@@ -105,6 +104,11 @@ class Calculation_Folder(os.PathLike, dict):
 
     def __add__(self, other):
         return self.output_folder + other
+
+    def __truediv__(self, other):
+        from pathlib import Path
+
+        return Path(self) / other
 
     def to_abspath(self, relative_path):
         return os.path.join(self, relative_path)
