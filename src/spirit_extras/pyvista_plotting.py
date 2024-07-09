@@ -7,9 +7,10 @@ import numpy as np
 import os
 import json
 import pyvista as pv
+from .data import Spin_System
 
 
-def create_point_cloud(spin_system):
+def create_point_cloud(spin_system: Spin_System) -> pv.PolyData:
     point_cloud = pv.PolyData(spin_system.positions)
     point_cloud["spins_x"] = spin_system.spins[:, 0]
     point_cloud["spins_y"] = spin_system.spins[:, 1]
@@ -19,7 +20,9 @@ def create_point_cloud(spin_system):
     return point_cloud
 
 
-def interpolate_point_cloud(spin_system, point_cloud=None, factor=1):
+def interpolate_point_cloud(
+    spin_system: Spin_System, point_cloud: pv.PolyData = None, factor: int = 1
+) -> pv.PolyData:
     if point_cloud is None:
         point_cloud = create_point_cloud(spin_system)
 
@@ -48,29 +51,21 @@ def interpolate_point_cloud(spin_system, point_cloud=None, factor=1):
     return pv.PolyData(positions_interpolated).interpolate(point_cloud)
 
 
-def delaunay(point_cloud):
+def delaunay(point_cloud: pv.PolyData):
     return point_cloud.delaunay_3d(progress_bar=True)
 
 
-def isosurface_from_delaunay(delaunay, isovalue=0, scalars_key="spins_z"):
-    import pyvista as pv
-
+def isosurface_from_delaunay(
+    delaunay, isovalue: float = 0, scalars_key: str = "spins_z"
+):
     # Create the contour
     isosurface = delaunay.contour([isovalue], scalars=scalars_key, progress_bar=True)
+
     if isosurface.n_faces < 1:
         return None
+
     isosurface = isosurface.smooth()
     return isosurface
-
-
-def arrows_from_point_cloud(
-    point_cloud, factor=1, scale=False, orient="spins", geom=None
-):
-    if geom is None:
-        geom = pv.Cone(radius=0.25, resolution=9)
-
-    arrows = point_cloud.glyph(orient=orient, scale=scale, factor=factor, geom=geom)
-    return arrows
 
 
 def create_pre_image(
@@ -168,9 +163,11 @@ import pyvista as pv
 class Spin_Plotter:
     """A class to create pyvista plots of spin systems."""
 
-    def __init__(self, system):
-        self.spin_system = system
+    def __init__(self, system: Spin_System):
+        # The spin system
+        self.spin_system: Spin_System = system
 
+        # Point cloud representing the spin system
         self._point_cloud = create_point_cloud(system)
 
         self._delaunay = None
@@ -182,19 +179,22 @@ class Spin_Plotter:
         self.meshlist = []
         self.resolution = (1980, 1080)
 
-        self.camera_position = None
-        self.camera_up = None
-        self.camera_focal_point = None
-        self.camera_azimuth = None
-        self.camera_elevation = None
-        self.camera_distance = None
-        self.camera_view_angle = None
-        self._render_to_png = True
-        self.shape = (1, 1)
+        self.camera_dict = dict(
+            position=None,
+            up=None,
+            focal_point=None,
+            azimuth=None,
+            elevation=None,
+            distance=None,
+            view_angle=None,
+        )
+
+        # self._render_to_png = True
+        # self.shape = (1, 1)
 
         self._preimages = []
 
-        self._plotter = None
+        self._plotter: pv.Plotter = None
 
         self.default_render_args = dict(
             scalars="spins_rgba",
@@ -210,11 +210,7 @@ class Spin_Plotter:
     def camera_from_json(self, save_camera_file):
         with open(save_camera_file, "r") as f:
             data = json.load(f)
-        self.camera_position = data["position"]
-        self.camera_up = data["up"]
-        self.camera_focal_point = data["focal_point"]
-        self.camera_distance = data["distance"]
-        self.camera_view_angle = data["view_angle"]
+        self.camera_dict = data.copy()
 
     def _string_to_direction(self, input):
         """Converts strings like "+X-Z" to normalized directions, here 1/sqrt(2)[1,0,-1]
@@ -252,28 +248,34 @@ class Spin_Plotter:
 
         direction /= np.linalg.norm(direction)
 
-        self.camera_view_angle = view_angle
-        self.camera_position = look_at + distance * direction
-        self.camera_focal_point = look_at - 2 * distance * direction
+        self.camera_dict["view_angle"] = view_angle
+        self.camera_dict["position"] = look_at + distance * direction
+        self.camera_dict["focal_point"] = look_at - 2 * distance * direction
 
     def rotate_camera(self, axis, angle):
         from scipy.spatial.transform import Rotation
 
         R = Rotation.from_rotvec(angle * np.array(axis)).as_matrix()
-        relative_pos = self.camera_position - self.camera_focal_point
-        self.camera_position = np.dot(R, relative_pos) + self.camera_focal_point
-        self.camera_up = np.dot(R, self.camera_up)
+        relative_pos = self.camera_dict["position"] - self.camera_dict["focal_point"]
+        self.camera_dict["position"] = (
+            np.dot(R, relative_pos) + self.camera["focal_point"]
+        )
+        self.camera_dict["up"] = np.dot(R, self.camera_dict["up"])
 
     def align_camera_position(self, axis, align_direction, distance=None):
         if distance is None:
-            distance = np.linalg.norm(self.camera_focal_point - self.camera_position)
+            distance = np.linalg.norm(
+                self.camera_dict["focal_point"] - self.camera_dict["position"]
+            )
 
         # Remove component along axis from align direction and from current relative position
         align_direction = np.array(align_direction)
         align_direction = align_direction - np.dot(align_direction, axis) * axis
         align_direction /= np.linalg.norm(align_direction)
 
-        current_relative_pos = self.camera_position - self.camera_focal_point
+        current_relative_pos = (
+            self.camera_dict["position"] - self.camera_dict["focal_point"]
+        )
         current_relative_pos /= np.linalg.norm(current_relative_pos)
 
         # Comp along axis
@@ -281,33 +283,36 @@ class Spin_Plotter:
 
         relative_pos = align_direction + axis_component
         relative_pos /= np.linalg.norm(relative_pos)
-        self.camera_position = self.camera_focal_point + relative_pos * distance
+
+        self.camera_dict["position"] = (
+            self.camera_dict["focal_point"] + relative_pos * distance
+        )
 
     def align_camera_up(self, axis):
         from scipy.spatial.transform import Rotation
 
-        relative_pos = self.camera_position - self.camera_focal_point
-        self.camera_up = (
+        relative_pos = self.camera_dict["position"] - self.camera_dict["focal_point"]
+        self.camera_dict["up"] = (
             axis
             - relative_pos.dot(axis) / np.linalg.norm(relative_pos) ** 2 * relative_pos
         )
-        self.camera_up /= np.linalg.norm(self.camera_up)
+        self.camera_dict["up"] /= np.linalg.norm(self.camera_dict["up"])
 
-    def _set_camera(self, plotter):
-        if not self.camera_position is None:
-            plotter.camera.position = self.camera_position
-        if not self.camera_azimuth is None:
-            plotter.camera.azimuth = self.camera_azimuth
-        if not self.camera_elevation is None:
-            plotter.camera.elevation = self.camera_elevation
-        if not self.camera_focal_point is None:
-            plotter.camera.focal_point = self.camera_focal_point
-        if not self.camera_up is None:
-            plotter.camera.up = self.camera_up
-        if not self.camera_distance is None:
-            plotter.camera.distance = self.camera_distance
-        if not self.camera_view_angle is None:
-            plotter.camera.view_angle = self.camera_view_angle
+    def _set_camera(self, plotter: pv.Plotter):
+        if not self.camera_dict.get("position", None) is None:
+            plotter.camera.position = self.camera_dict["position"]
+        if not self.camera_dict.get("azimuth", None) is None:
+            plotter.camera.azimuth = self.camera_dict["azimuth"]
+        if not self.camera_dict.get("elevation", None) is None:
+            plotter.camera.elevation = self.camera_dict["elevation"]
+        if not self.camera_dict.get("focal_point", None) is None:
+            plotter.camera.focal_point = self.camera_dict["focal_point"]
+        if not self.camera_dict.get("up", None) is None:
+            plotter.camera.up = self.camera_dict["up"]
+        if not self.camera_dict.get("distance", None) is None:
+            plotter.camera.distance = self.camera_dict["distance"]
+        if not self.camera_dict.get("view_angle", None) is None:
+            plotter.camera.view_angle = self.camera_dict["view_angle"]
 
     def compute_delaunay(self):
         self._delaunay = delaunay(self._point_cloud)
@@ -344,36 +349,45 @@ class Spin_Plotter:
 
         self._point_cloud["spins_rgba"] = self._colormap(self.spin_system.spins)
 
-    def add_mesh(self, mesh, render_args):
+    def add_mesh(self, mesh, **render_args):
         self.meshlist.append([mesh, render_args])
         return self.meshlist[-1]
 
     def clear_meshes(self):
         self.meshlist = []
 
-    def isosurface(self, isovalue, scalars_key, render_args=None):
+    def isosurface(self, isovalue, scalars_key, **render_args):
         if not self._delaunay:
             raise Exception("No delaunay")
 
-        if render_args is None:
-            render_args = self.default_render_args.copy()
-        iso = isosurface_from_delaunay(self._delaunay, isovalue, scalars_key)
-
-        if iso is None:
-            return None, {}
-        else:
-            return self.add_mesh(iso, render_args)
-
-    def arrows(self, geom=None, render_args=None, factor=1):
-        if render_args is None:
-            render_args = self.default_render_args.copy()
-
-        return self.add_mesh(
-            arrows_from_point_cloud(
-                self._point_cloud, factor=factor, scale=False, orient="spins", geom=geom
-            ),
-            render_args,
+        # Create the contour
+        isosurface = self._delaunay.contour(
+            [isovalue], scalars=scalars_key, progress_bar=True
         )
+        if isosurface.n_faces < 1:
+            return None
+        isosurface = isosurface.smooth_taubin(n_iter=1000)
+
+        args = self.default_render_args.copy()
+        args.update(render_args)
+
+        return self.add_mesh(isosurface, **args)
+
+    def arrows(self, glyph_args=dict(), **render_args):
+        glyph_default_args = dict(
+            orient="spins",
+            factor=1,
+            geom=pv.Cone(radius=0.25, resolution=9),
+            scale=False,
+        )
+
+        glyph_default_args.update(glyph_args)
+        arrows = self._point_cloud.glyph(**glyph_default_args)
+
+        args = self.default_render_args.copy()
+        args.update(render_args)
+
+        self.add_mesh(arrows, **args)
 
     def add_preimage(
         self,
@@ -409,23 +423,17 @@ class Spin_Plotter:
             z_color=colors[2],
         )
 
-    def plotter(self, render_to_png=True, shape=None) -> pv.Plotter:
-        if shape is None:
-            shape = self.shape
+    def setup_plotter(self, render_to_png, **kwargs) -> pv.Plotter:
+        if not self.plotter is None:
+            return
 
-        new_plotter = False
-        if render_to_png != self._render_to_png or shape != self.shape:
-            new_plotter = True
+        self._render_to_png = render_to_png
 
-        if self._plotter is None or new_plotter:
-            self._render_to_png = render_to_png
-            self.shape = shape
-            if not self._plotter is None:
-                self._plotter.close()
-            if render_to_png:
-                pv.start_xvfb(wait=self._xvfb_wait)
-            self._plotter = pv.Plotter(off_screen=render_to_png, shape=self.shape)
-            self._plotter.window_size = self.resolution
+        # if render_to_png:
+        #     pv.start_xvfb(wait=self._xvfb_wait)
+
+        self._plotter = pv.Plotter(off_screen=render_to_png, **kwargs)
+        self._plotter.window_size = self.resolution
 
         self._set_camera(self._plotter)
 
@@ -439,11 +447,16 @@ class Spin_Plotter:
             else:
                 self._plotter.set_background(self.background_color)
 
+    def clear_plotter(self):
+        if self._plotter is None:
+            self._plotter.close()
+        self._plotter = None
+
+    @property
+    def plotter(self):
         return self._plotter
 
-    def show(self, save_camera_file=None):
-        plotter = self.plotter(render_to_png=False)
-
+    def apply_meshes(self, plotter):
         for m, args in self.meshlist:
             try:
                 plotter.add_mesh(m, **args)
@@ -451,16 +464,24 @@ class Spin_Plotter:
                 print(f"Could not add_mesh {m}")
                 print(e)
 
+    def show(self, save_camera_file=None, persist_camera=False):
+        self.setup_plotter(render_to_png=False)
+        self.apply_meshes(self.plotter)
         self._plotter.show()
 
+        camera_dict = dict(
+            azimuth=self.plotter.camera.azimuth,
+            position=self.plotter.camera.position,
+            up=self.plotter.camera.up,
+            focal_point=self.plotter.camera.focal_point,
+            distance=self.plotter.camera.distance,
+            view_angle=self.plotter.camera.view_angle,
+        )
+
+        if persist_camera:
+            self.camera_dict = camera_dict.copy()
+
         if save_camera_file is not None:
-            camera_dict = dict(
-                position=plotter.camera.position,
-                up=plotter.camera.up,
-                focal_point=plotter.camera.focal_point,
-                distance=plotter.camera.distance,
-                view_angle=plotter.camera.view_angle,
-            )
             with open(save_camera_file, "w") as f:
                 f.write(json.dumps(camera_dict, indent=4))
 
@@ -469,16 +490,9 @@ class Spin_Plotter:
         if not (len(ext) == 0 or ext.lower() == ".png"):
             raise Exception("File extension must be either '.png' or not specified")
 
-        plotter = self.plotter()
-
-        for m, args in self.meshlist:
-            try:
-                plotter.add_mesh(m, **args)
-            except Exception as e:
-                print(f"Could not add_mesh {m}")
-                print(e)
-
-        plotter.screenshot(
+        self.setup_plotter(render_to_png=True)
+        self.apply_meshes(self.plotter)
+        self.plotter.screenshot(
             file_name + ".png", transparent_background=self.transparent_background
         )
 
