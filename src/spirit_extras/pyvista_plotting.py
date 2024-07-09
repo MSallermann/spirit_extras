@@ -424,9 +424,7 @@ class Spin_Plotter:
                 self._plotter.close()
             if render_to_png:
                 pv.start_xvfb(wait=self._xvfb_wait)
-            self._plotter = pv.Plotter(
-                off_screen=render_to_png, shape=self.shape, multi_samples=8
-            )
+            self._plotter = pv.Plotter(off_screen=render_to_png, shape=self.shape)
             self._plotter.window_size = self.resolution
 
         self._set_camera(self._plotter)
